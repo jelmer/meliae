@@ -31,10 +31,11 @@ def spawn_and_track(opts, args):
     mem_secs = 0
     while p.poll() is None:
         now = timer()
-        cur_mem, peak_mem = perf_counter.perf_counter.get_memory(p)
-        if cur_mem is None or peak_mem is None:
+        vals = perf_counter.perf_counter.get_memory(p)
+        if None in vals:
             p.wait()
             break
+        cur_mem, peak_mem = vals
         mem_secs += cur_mem * (now - last)
         last = now
         time.sleep(opts.sleep_time)
