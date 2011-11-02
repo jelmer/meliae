@@ -29,6 +29,7 @@ def spawn_and_track(opts, args):
     last = start
     last_print = 0
     mem_secs = 0
+    cur_mem = peak_mem = 0
     while p.poll() is None:
         now = timer()
         vals = perf_counter.perf_counter.get_memory(p)
