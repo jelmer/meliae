@@ -421,8 +421,16 @@ _dump_unicode(struct ref_info *info, PyObject *c_obj)
     for (i = 0; i < uni_size; ++i) {
         c = uni_buf[i];
         if (c <= 0x1f || c > 0x7e) {
-            ptr += snprintf(ptr, end-ptr, "\\u%04x",
-                            ((unsigned short)c & 0xFFFF));
+            if (c > 0xFFFF) {
+                // Use surrogate pair.
+                c -= 0x10000;
+                int hi = 0xD800 | ((c >> 10) & 0x3FF);
+                int lo = 0xDC00 | (c         & 0x3FF);
+                ptr += snprintf(ptr, end-ptr, "\\u%04x", hi);
+                ptr += snprintf(ptr, end-ptr, "\\u%04x", lo);
+            } else {
+                ptr += snprintf(ptr, end-ptr, "\\u%04x", c);
+            }
         } else if (c == '\\' || c == '/' || c == '"') {
             *ptr++ = '\\';
             *ptr++ = (char)c;
