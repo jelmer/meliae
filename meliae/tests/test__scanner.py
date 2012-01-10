@@ -18,7 +18,6 @@ import gc
 import sys
 import tempfile
 import types
-from unittest import skipIf
 import zlib
 
 from meliae import (
@@ -302,8 +301,6 @@ class TestJSONUnicode(tests.TestCase):
     def test_simple_escapes(self):
         self.assertJSONUnicode(r'"\\x\/y\""', ur'\x/y"')
 
-    @skipIf(sys.maxunicode <= 0xffff,
-            "This Python doesn't support non-BMP unicode char")
     def test_non_bmp(self):
         self.assertJSONUnicode(r'"\ud808\udf45"', u"\U00012345")
 
