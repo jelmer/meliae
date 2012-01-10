@@ -18,6 +18,7 @@ import gc
 import sys
 import tempfile
 import types
+from unittest import skipIf
 import zlib
 
 from meliae import (
@@ -248,7 +249,10 @@ def _string_to_json(s):
 def _unicode_to_json(u):
     out = ['"']
     for c in u:
-        if c <= u'\u001f' or c > u'\u007e':
+        if c > u'\uffff':
+            surrogate = c.encode('utf_16_be').encode('hex')
+            out.append(r'\u%s\u%s' % (surrogate[:4], surrogate[4:]))
+        elif c <= u'\u001f' or c > u'\u007e':
             out.append(r'\u%04x' % ord(c))
         elif c in ur'\/"':
             # Simple escape
@@ -297,6 +301,11 @@ class TestJSONUnicode(tests.TestCase):
 
     def test_simple_escapes(self):
         self.assertJSONUnicode(r'"\\x\/y\""', ur'\x/y"')
+
+    @skipIf(sys.maxunicode <= 0xffff,
+            "This Python doesn't support non-BMP unicode char")
+    def test_non_bmp(self):
+        self.assertJSONUnicode(r'"\ud808\udf45"', u"\U00012345")
 
 
 # A pure python implementation of dump_object_info
