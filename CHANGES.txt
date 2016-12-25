@@ -14,6 +14,9 @@ Meliae 0.5
   'obj[-1]' to get the last child, (same as obj.c[-1]).
   (Robert Xiao, #882356)
 
+* Raise NotImplementedError when trying to get memory counters on
+  GNU/Hurd. (Jelmer Vernooĳ)
+
 Meliae 0.4
 ##########
 
