@@ -291,7 +291,7 @@ class TestObjManager(tests.TestCase):
         content = [
 '{"address": 2, "type": "str", "size": 25, "len": 1, "value": "a", "refs": []}',
 ]
-        for x in xrange(200):
+        for x in range(200):
             content.append('{"address": %d, "type": "tuple", "size": 20,'
                            ' "len": 2, "refs": [2, 2]}' % (x+100))
         # By default, we only track 100 parents
