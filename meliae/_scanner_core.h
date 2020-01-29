@@ -50,7 +50,7 @@ extern void _dump_object_info(write_callback write, void *callee_data,
 /**
  * Clear out what the last object we dumped was.
  */
-extern void _clear_last_dumped();
+extern void _clear_last_dumped(void);
 
 /**
  * Return a PyList of all objects referenced via tp_traverse.
@@ -64,7 +64,7 @@ extern PyObject *_get_referents(PyObject *c_obj);
  * figured out via trial-and-error.
  * The key is tp_name strings, the value is a PyInt of the appropriate size.
  */
-extern PyObject *_get_special_case_dict();
+extern PyObject *_get_special_case_dict(void);
 
 
 #endif // _SCANNER_CORE_H_
