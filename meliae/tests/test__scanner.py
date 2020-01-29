@@ -147,14 +147,15 @@ class TestSizeOf(tests.TestCase):
         self.assertSizeOf(4, Two())
 
     def test_empty_unicode(self):
-        self.assertSizeOf(6, u'', extra_size=0, has_gc=False)
+        self.assertSizeOf(6, u'', extra_size=_scanner._unicode_size,
+                          has_gc=False)
 
     def test_small_unicode(self):
-        self.assertSizeOf(6, u'a', extra_size=_scanner._unicode_size*1,
+        self.assertSizeOf(6, u'a', extra_size=_scanner._unicode_size*2,
                           has_gc=False)
-        self.assertSizeOf(6, u'abcd', extra_size=_scanner._unicode_size*4,
+        self.assertSizeOf(6, u'abcd', extra_size=_scanner._unicode_size*5,
                           has_gc=False)
-        self.assertSizeOf(6, u'\xbe\xe5', extra_size=_scanner._unicode_size*2,
+        self.assertSizeOf(6, u'\xbe\xe5', extra_size=_scanner._unicode_size*3,
                           has_gc=False)
 
     def test_None(self):

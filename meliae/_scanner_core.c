@@ -185,7 +185,7 @@ _size_of_unicode(PyUnicodeObject *c_obj)
 {
     Py_ssize_t size;
     size = _basic_object_size((PyObject *)c_obj);
-    size += Py_UNICODE_SIZE * c_obj->length;
+    size += Py_UNICODE_SIZE * (c_obj->length + 1);
     return size;
 }
 
