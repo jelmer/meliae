@@ -15,7 +15,18 @@
 
 
 def config():
-    import meliae
+    try:
+        import meliae
+    except ImportError:
+        # The directory containing setup.py may not be on PYTHONPATH.
+        # Insert it and try again.
+        import os
+        import sys
+
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+        import meliae
+
     ext = []
     kwargs = {
         "name": "meliae",
@@ -59,15 +70,8 @@ The name is simply a fun word (means Ash-wood Nymph).
 """
     }
 
-    from distutils.core import setup, Extension
+    from setuptools import setup, Extension
 
-    try:
-        from Cython.Distutils import build_ext
-    except ImportError:
-        print "We require Cython to be installed."
-        return
-
-    kwargs["cmdclass"] = {"build_ext": build_ext}
     ext.append(Extension("meliae._scanner",
                          ["meliae/_scanner.pyx",
                           "meliae/_scanner_core.c"]))
