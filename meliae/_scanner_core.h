@@ -44,7 +44,7 @@ typedef void (*write_callback)(void *data, const char *bytes, size_t len);
 /**
  * Write the information about this object to the file.
  */
-extern void _dump_object_info(write_callback write, void *callee_data,
+extern void _dump_object_info(PyObject *out,
                               PyObject *c_obj, PyObject *nodump, int recurse);
 
 /**

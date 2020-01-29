@@ -438,14 +438,80 @@ _dump_unicode(struct ref_info *info, PyObject *c_obj)
 }
 
 
+#if PY_VERSION_HEX < 0x03000000
+static void
+_file_io_callback(void *callee_data, const char *bytes, size_t len)
+{
+    fwrite(bytes, 1, len, (FILE *)callee_data);
+}
+#endif
+
+
+static void
+_callable_callback(void *callee_data, const char *bytes, size_t len)
+{
+    PyObject *callable, *s, *ret;
+
+    callable = (PyObject *)callee_data;
+    Py_INCREF(callable);
+
+#if PY_VERSION_HEX >= 0x03000000
+    s = PyBytes_FromStringAndSize(bytes, len);
+#else
+    s = PyString_FromStringAndSize(bytes, len);
+#endif
+    if (s == NULL) {
+        /* ignore errors */
+        PyErr_Clear();
+        goto out;
+    }
+    ret = PyObject_CallFunctionObjArgs(callable, s, NULL);
+    if (ret == NULL) {
+        /* ignore errors */
+        PyErr_Clear();
+        goto out;
+    } else {
+        Py_DECREF(ret);
+    }
+
+out:
+    if (s != NULL) {
+        Py_DECREF(s);
+    }
+    Py_DECREF(callable);
+}
+
+
 void 
-_dump_object_info(write_callback write, void *callee_data,
+_dump_object_info(PyObject *out,
                   PyObject *c_obj, PyObject *nodump, int recurse)
 {
-    struct ref_info info;
+    struct ref_info info = { NULL, NULL, 0, NULL };
+    PyObject *write_method = NULL;
 
-    info.write = write;
-    info.data = callee_data;
+#if PY_VERSION_HEX < 0x03000000
+    {
+        FILE *fp_out = PyFile_AsFile(out);
+        if (fp_out != NULL) {
+            info.write = _file_io_callback;
+            info.data = fp_out;
+        }
+    }
+#endif
+    if (info.write == NULL) {
+        write_method = PyObject_GetAttrString(out, "write");
+        if (write_method != NULL) {
+            Py_INCREF(write_method);
+            info.write = _callable_callback;
+            info.data = (void *)write_method;
+        } else {
+            PyErr_Clear();
+        }
+    }
+    if (info.write == NULL) {
+        info.write = _callable_callback;
+        info.data = (void *)out;
+    }
     info.first = 1;
     info.nodump = nodump;
     if (nodump != NULL) {
@@ -455,6 +521,15 @@ _dump_object_info(write_callback write, void *callee_data,
     if (info.nodump != NULL) {
         Py_DECREF(nodump);
     }
+    if (write_method != NULL) {
+        Py_DECREF(write_method);
+    }
+
+#if PY_VERSION_HEX < 0x03000000
+    if (info.write == _file_io_callback) {
+        fflush(info.data);
+    }
+#endif
 }
 
 void

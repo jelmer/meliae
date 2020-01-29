@@ -38,7 +38,7 @@ cdef extern from "_scanner_core.h":
                    size_t len)
 
     void _clear_last_dumped()
-    void _dump_object_info(write_callback write, void *callee_data,
+    void _dump_object_info(object out,
                            object c_obj, object nodump, int recurse)
     object _get_referents(object c_obj)
     object _get_special_case_dict()
@@ -62,20 +62,6 @@ def size_of(obj):
     return _size_of(obj)
 
 
-cdef void _file_io_callback(void *callee_data, char *bytes, size_t len):
-    cdef FILE *file_cb
-
-    file_cb = <FILE *>callee_data
-    fwrite(bytes, 1, len, file_cb)
-
-
-cdef void _callable_callback(void *callee_data, char *bytes, size_t len):
-    callable = <object>callee_data
-
-    s = PyString_FromStringAndSize(bytes, len)
-    callable(s)
-
-
 def dump_object_info(object out, object obj, object nodump=None,
                      int recurse_depth=1):
     """Dump the object information to the given output.
@@ -93,16 +79,7 @@ def dump_object_info(object out, object obj, object nodump=None,
        referenced (such as strings).
        2 dump everything we find and continue recursing
     """
-    cdef FILE *fp_out
-
-    fp_out = PyFile_AsFile(out)
-    if fp_out != NULL:
-        _dump_object_info(<write_callback>_file_io_callback, fp_out, obj,
-                          nodump, recurse_depth)
-        fflush(fp_out)
-    else:
-        _dump_object_info(<write_callback>_callable_callback, <void *>out, obj,
-                          nodump, recurse_depth)
+    _dump_object_info(out, obj, nodump, recurse_depth)
     _clear_last_dumped()
 
 
