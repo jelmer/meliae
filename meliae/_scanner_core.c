@@ -80,7 +80,7 @@ _basic_object_size(PyObject *c_obj)
 {
     Py_ssize_t size;
     size = c_obj->ob_type->tp_basicsize;
-    if (PyType_HasFeature(c_obj->ob_type, Py_TPFLAGS_HAVE_GC)) {
+    if (PyObject_IS_GC(c_obj)) {
         size += sizeof(PyGC_Head);
     }
     return size;
@@ -116,7 +116,7 @@ _object_to_size_with_gc(PyObject *size_obj, PyObject *c_obj)
     }
     // There is one trick left. Namely, __sizeof__ doesn't include the
     // GC overhead, so let's add that back in
-    if (PyType_HasFeature(Py_TYPE(c_obj), Py_TPFLAGS_HAVE_GC)) {
+    if (PyObject_IS_GC(c_obj)) {
         size += sizeof(PyGC_Head);
     }
     return size;
@@ -340,7 +340,7 @@ _dump_if_no_traverse(PyObject *c_obj, void *val)
                && !PyType_HasFeature((PyTypeObject*)c_obj, Py_TPFLAGS_HEAPTYPE)))
     {
         _dump_object_to_ref_info(info, c_obj, 0);
-    } else if (!PyType_HasFeature(Py_TYPE(c_obj), Py_TPFLAGS_HAVE_GC)) {
+    } else if (!PyObject_IS_GC(c_obj)) {
         /* This object is not considered part of the garbage collector, even
          * if it does [not] have a tp_traverse function.
          */

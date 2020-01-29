@@ -114,9 +114,9 @@ class TestSizeOf(tests.TestCase):
         type_size = 106
         if sys.version_info[:2] >= (2, 6):
             type_size = 109
-        self.assertSizeOf(type_size, dict)
-        self.assertSizeOf(type_size, set)
-        self.assertSizeOf(type_size, tuple)
+        self.assertSizeOf(type_size, dict, has_gc=False)
+        self.assertSizeOf(type_size, set, has_gc=False)
+        self.assertSizeOf(type_size, tuple, has_gc=False)
 
     def test_user_type(self):
         class Foo(object):
