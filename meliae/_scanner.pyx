@@ -28,7 +28,6 @@ cdef extern from "Python.h":
     int Py_UNICODE_SIZE
     ctypedef struct PyGC_Head:
         pass
-    object PyString_FromStringAndSize(char *, Py_ssize_t)
 
 
 cdef extern from "_scanner_core.h":
