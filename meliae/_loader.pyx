@@ -601,7 +601,7 @@ cdef class _MemObjectProxy:
             # Instance dicts end with a 'type' reference, but only do that if
             # we actually have an odd number
             children = children[:-1]
-        for idx in xrange(0, len(children), 2):
+        for idx in range(0, len(children), 2):
             key = self.collection[children[idx]]
             val = self.collection[children[idx+1]]
             if key.value is not None:

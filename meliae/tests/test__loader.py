@@ -132,7 +132,7 @@ class TestMemObjectCollection(tests.TestCase):
 
     def test_add_until_resize(self):
         moc = _loader.MemObjectCollection()
-        for i in xrange(1025):
+        for i in range(1025):
             moc.add(i, 'foo', 100+i)
         self.assertEqual(1025, moc._filled)
         self.assertEqual(1025, moc._active)

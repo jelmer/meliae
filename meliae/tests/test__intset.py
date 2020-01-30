@@ -87,7 +87,7 @@ class TestIntSet(tests.TestCase):
 
     def test_add_and_grow(self):
         iset = self._set_type()
-        for i in xrange(0, 10000):
+        for i in range(0, 10000):
             iset.add(i)
         self.assertEqual(10000, len(iset))
 

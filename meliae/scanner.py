@@ -89,8 +89,8 @@ def dump_gc_objects(outf, recurse_depth=1):
     # Dump out a few specific objects, so they don't get repeated forever
     nodump = [None, True, False]
     # In current versions of python, these are all pre-cached
-    nodump.extend(xrange(-5, 256))
-    nodump.extend([chr(c) for c in xrange(256)])
+    nodump.extend(range(-5, 256))
+    nodump.extend([chr(c) for c in range(256)])
     nodump.extend([t for t in types.__dict__.itervalues()
                       if type(t) is types.TypeType])
     nodump.extend([set, dict])
