@@ -41,7 +41,7 @@ add_special_size("numpy.ndarray", _size_of_ndarray, _size_of_ndarray)
 
 def dump_all_referenced(outf, obj, is_pending=False):
     """Recursively dump everything that is referenced from obj."""
-    if isinstance(outf, str):
+    if isinstance(outf, basestring):
         outf = open(outf, 'wb')
     if is_pending:
         pending = obj
