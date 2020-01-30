@@ -1,3 +1,6 @@
+./*.egg-info
+./.eggs
+./.tox
 ./build
 ./meliae/_intset.c
 ./meliae/_loader.c

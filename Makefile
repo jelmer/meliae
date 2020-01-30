@@ -1,7 +1,7 @@
 all: build_inplace
 
-check: all
-	python run_tests.py
+check:
+	tox
 
 build_inplace:
 	python setup.py build_ext -i
