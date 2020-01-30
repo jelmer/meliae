@@ -60,7 +60,7 @@ static void _write_to_ref_info(struct ref_info *info, const char *fmt_string, ..
 #else
 static void _write_to_ref_info(struct ref_info *info, const char *fmt_string, ...);
 #endif
-static PyObject * _get_specials();
+static PyObject * _get_specials(void);
 
 /* The address of the last thing we dumped. Stuff like dumping the string
  * interned dictionary will dump the same string 2x in a row. This helps
@@ -70,7 +70,7 @@ static PyObject *_last_dumped = NULL;
 static PyObject *_special_case_dict = NULL;
 
 void
-_clear_last_dumped()
+_clear_last_dumped(void)
 {
     _last_dumped = NULL;
 }
@@ -617,7 +617,7 @@ _get_referents(PyObject *c_obj)
 }
 
 static PyObject *
-_get_specials()
+_get_specials(void)
 {
     if (_special_case_dict == NULL) {
         _special_case_dict = PyDict_New();
@@ -626,7 +626,7 @@ _get_specials()
 }
 
 PyObject *
-_get_special_case_dict()
+_get_special_case_dict(void)
 {
     PyObject *ret;
 
