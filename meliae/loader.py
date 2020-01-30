@@ -525,7 +525,7 @@ def load(source, using_json=None, show_prog=True, collapse=True,
     :param max_parents: See ObjManager.__init__(max_parents)
     """
     cleanup = None
-    if isinstance(source, str):
+    if isinstance(source, basestring):
         source, cleanup = files.open_file(source)
         if isinstance(source, file):
             input_size = os.fstat(source.fileno()).st_size
