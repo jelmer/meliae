@@ -14,6 +14,8 @@
 
 """Pyrex extension for tracking loaded objects"""
 
+import sys
+
 from meliae import (
     _loader,
     _scanner,
@@ -51,7 +53,10 @@ class TestMemObjectCollection(tests.TestCase):
         self.assertEqual(255, moc._test_lookup(255))
         self.assertEqual(933, moc._test_lookup(933))
         self.assertEqual(933, moc._test_lookup(933+1024))
-        self.assertEqual(933, moc._test_lookup(933L+1024L))
+        if sys.version_info[0] < 3:
+            # 1024L was more idiomatic in Python 2, but is a syntax error in
+            # Python 3.
+            self.assertEqual(933, moc._test_lookup(long(933)+long(1024)))
 
     def test__len__(self):
         moc = _loader.MemObjectCollection()
