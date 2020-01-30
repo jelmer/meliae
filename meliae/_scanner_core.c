@@ -79,7 +79,7 @@ static Py_ssize_t
 _basic_object_size(PyObject *c_obj)
 {
     Py_ssize_t size;
-    size = c_obj->ob_type->tp_basicsize;
+    size = Py_TYPE(c_obj)->tp_basicsize;
     if (PyObject_IS_GC(c_obj)) {
         size += sizeof(PyGC_Head);
     }
@@ -98,7 +98,7 @@ _var_object_size(PyVarObject *c_obj)
         PyErr_Clear();
     }
     return _basic_object_size((PyObject *)c_obj)
-            + num_entries * c_obj->ob_type->tp_itemsize;
+            + num_entries * Py_TYPE(c_obj)->tp_itemsize;
 }
 
 static Py_ssize_t
@@ -227,7 +227,7 @@ _size_of_from_var_or_basic_size(PyObject *c_obj)
      * method.
      */
 
-    if (c_obj->ob_type->tp_itemsize != 0) {
+    if (Py_TYPE(c_obj)->tp_itemsize != 0) {
         // Variable length object with inline storage
         // total size is tp_itemsize * ob_size
         return _var_object_size((PyVarObject *)c_obj);
@@ -500,7 +500,7 @@ _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj, int recurse)
     _last_dumped = c_obj;
     _write_to_ref_info(info, "{\"address\": %lu, \"type\": ",
                        (unsigned long)c_obj);
-    _dump_json_c_string(info, c_obj->ob_type->tp_name, -1);
+    _dump_json_c_string(info, Py_TYPE(c_obj)->tp_name, -1);
     _write_to_ref_info(info, ", \"size\": " SSIZET_FMT, _size_of(c_obj));
     //  HANDLE __name__
     if (PyModule_Check(c_obj)) {
