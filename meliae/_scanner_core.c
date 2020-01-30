@@ -106,7 +106,11 @@ _object_to_size_with_gc(PyObject *size_obj, PyObject *c_obj)
 {
     Py_ssize_t size = -1;
 
+#if PY_VERSION_HEX >= 0x03000000
+    size = PyLong_AsSsize_t(size_obj);
+#else
     size = PyInt_AsSsize_t(size_obj);
+#endif
     if (size == -1) {
         // Probably an error occurred, we don't know for sure, but we might as
         // well just claim that we don't know the size. We *could* check
@@ -250,7 +254,9 @@ _size_of(PyObject *c_obj)
         return _size_of_unicode((PyUnicodeObject *)c_obj);
     } else if (PyTuple_CheckExact(c_obj)
             || PyString_CheckExact(c_obj)
+#if PY_VERSION_HEX < 0x03000000
             || PyInt_CheckExact(c_obj)
+#endif
             || PyBool_Check(c_obj)
             || c_obj == Py_None
             || PyModule_CheckExact(c_obj))
@@ -536,10 +542,14 @@ _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj, int recurse)
         } else if (c_obj == Py_False) {
             _write_static_to_info(info, ", \"value\": \"False\"");
         } else {
-            _write_to_ref_info(info, ", \"value\": %ld", PyInt_AS_LONG(c_obj));
+            _write_to_ref_info(info, ", \"value\": %ld", PyLong_AsLong(c_obj));
         }
+#if PY_VERSION_HEX < 0x03000000
     } else if (PyInt_CheckExact(c_obj)) {
         _write_to_ref_info(info, ", \"value\": %ld", PyInt_AS_LONG(c_obj));
+#endif
+    } else if (PyLong_CheckExact(c_obj)) {
+        _write_to_ref_info(info, ", \"value\": %ld", PyLong_AsLong(c_obj));
     } else if (PyTuple_Check(c_obj)) {
         _write_to_ref_info(info, ", \"len\": " SSIZET_FMT, PyTuple_GET_SIZE(c_obj));
     } else if (PyList_Check(c_obj)) {

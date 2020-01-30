@@ -28,6 +28,7 @@ try:
     import simplejson
 except ImportError:
     simplejson = None
+import six
 
 from meliae import (
     files,
@@ -267,7 +268,7 @@ class ObjManager(object):
                     t = type(refs)
                     if refs is None:
                         refs = address
-                    elif t in (int, long):
+                    elif t in six.integer_types:
                         refs = (refs, address)
                     elif t is tuple:
                         if len(refs) >= 5:
@@ -314,7 +315,7 @@ class ObjManager(object):
                 else:
                     if refs is None:
                         obj.parents = ()
-                    elif type(refs) in (int, long):
+                    elif type(refs) in six.integer_types:
                         obj.parents = (refs,)
                     else:
                         # We use a set() to remove duplicate parents
