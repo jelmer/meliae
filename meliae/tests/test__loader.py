@@ -431,7 +431,7 @@ class Test_MemObjectProxy(tests.TestCase):
             return mop[idx]
         try:
             mop[2]
-        except IndexError, e:
+        except IndexError as e:
             e = e
         else:
             self.fail("IndexError not raised")
@@ -444,7 +444,7 @@ class Test_MemObjectProxy(tests.TestCase):
             return mop[idx]
         try:
             mop[-3]
-        except IndexError, e:
+        except IndexError as e:
             e = e
         else:
             self.fail("IndexError not raised")
