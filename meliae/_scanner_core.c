@@ -460,7 +460,6 @@ _dump_object_info(write_callback write, void *callee_data,
 void
 _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj, int recurse)
 {
-    Py_ssize_t size;
     int retval;
     int do_traverse;
     char *name;
@@ -492,7 +491,6 @@ _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj, int recurse)
         return;
     }
     _last_dumped = c_obj;
-    size = _size_of(c_obj);
     _write_to_ref_info(info, "{\"address\": %lu, \"type\": ",
                        (unsigned long)c_obj);
     _dump_json_c_string(info, c_obj->ob_type->tp_name, -1);
