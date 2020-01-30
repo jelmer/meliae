@@ -432,11 +432,10 @@ class Test_MemObjectProxy(tests.TestCase):
         try:
             mop[2]
         except IndexError as e:
-            e = e
+            self.assertEqual('%s has only 2 (not 3) references' % (mop,),
+                             str(e))
         else:
             self.fail("IndexError not raised")
-        self.assertEqual('%s has only 2 (not 3) references' % (mop,),
-                         str(e))
 
     def test__getitem__too_negative(self):
         mop = self.moc.add(1234567, 'type', 256, children=[0, 255])
@@ -445,10 +444,9 @@ class Test_MemObjectProxy(tests.TestCase):
         try:
             mop[-3]
         except IndexError as e:
-            e = e
+            self.assertEqual('ref index -3 out of range', str(e))
         else:
             self.fail("IndexError not raised")
-        self.assertEqual('ref index -3 out of range', str(e))
 
     def test_total_size(self):
         mop = self.moc[0]
