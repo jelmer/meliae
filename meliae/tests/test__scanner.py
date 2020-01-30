@@ -26,139 +26,121 @@ from meliae import (
     )
 
 
-STRING_BASE = 8
-STRING_SCALING = 4
-if sys.version_info[:2] >= (2, 7):
-    # In python2.7 they 'shrunk' strings by a couple bytes, by changing where
-    # the pointer was. So their base size is a few bytes smaller
-    STRING_BASE = 5
-
-
 class TestSizeOf(tests.TestCase):
 
-    def assertSizeOf(self, num_words, obj, extra_size=0, has_gc=True):
+    def assertSizeOf(self, obj):
+        self.assertEqual(sys.getsizeof(obj), _scanner.size_of(obj))
+
+    def assertExactSizeOf(self, num_words, obj, extra_size=0, has_gc=True):
         expected_size = extra_size + num_words * _scanner._word_size
         if has_gc:
             expected_size += _scanner._gc_head_size
         self.assertEqual(expected_size, _scanner.size_of(obj))
 
-    def test_empty_string(self):
-        fixed_size = STRING_BASE
-        self.assertSizeOf(STRING_SCALING, '', extra_size=0+STRING_BASE, has_gc=False)
+    def test_empty_bytes(self):
+        self.assertSizeOf(b'')
 
-    def test_short_string(self):
-        self.assertSizeOf(STRING_SCALING, 'a', extra_size=1+STRING_BASE, has_gc=False)
+    def test_short_bytes(self):
+        self.assertSizeOf(b'a')
 
-    def test_long_string(self):
-        self.assertSizeOf(STRING_SCALING, ('abcd'*25)*1024,
-                          extra_size=100*1024+STRING_BASE, has_gc=False)
+    def test_long_bytes(self):
+        self.assertSizeOf((b'abcd'*25)*1024)
 
     def test_tuple(self):
-        self.assertSizeOf(3, ())
+        self.assertSizeOf(())
 
     def test_tuple_one(self):
-        self.assertSizeOf(3+1, ('a',))
+        self.assertSizeOf(('a',))
 
     def test_tuple_n(self):
-        self.assertSizeOf(3+3, (1, 2, 3))
+        self.assertSizeOf((1, 2, 3))
 
     def test_empty_list(self):
-        self.assertSizeOf(5, [])
+        self.assertSizeOf([])
 
     def test_list_with_one(self):
-        self.assertSizeOf(5+1, [1])
+        self.assertSizeOf([1])
 
     def test_list_with_three(self):
-        self.assertSizeOf(5+3, [1, 2, 3])
+        self.assertSizeOf([1, 2, 3])
 
     def test_int(self):
-        self.assertSizeOf(3, 1, has_gc=False)
+        self.assertSizeOf(1)
 
     def test_list_appended(self):
         # Lists over-allocate when you append to them, we want the *allocated*
         # size
         lst = []
         lst.append(1)
-        self.assertSizeOf(5+4, lst)
+        self.assertSizeOf(lst)
 
     def test_empty_set(self):
-        self.assertSizeOf(25, set())
-        self.assertSizeOf(25, frozenset())
+        self.assertSizeOf(set())
+        self.assertSizeOf(frozenset())
 
     def test_small_sets(self):
-        self.assertSizeOf(25, set(range(1)))
-        self.assertSizeOf(25, set(range(2)))
-        self.assertSizeOf(25, set(range(3)))
-        self.assertSizeOf(25, set(range(4)))
-        self.assertSizeOf(25, set(range(5)))
-        self.assertSizeOf(25, frozenset(range(3)))
+        self.assertSizeOf(set(range(1)))
+        self.assertSizeOf(set(range(2)))
+        self.assertSizeOf(set(range(3)))
+        self.assertSizeOf(set(range(4)))
+        self.assertSizeOf(set(range(5)))
+        self.assertSizeOf(frozenset(range(3)))
 
     def test_medium_sets(self):
-        self.assertSizeOf(25 + 512*2, set(range(100)))
-        self.assertSizeOf(25 + 512*2, frozenset(range(100)))
+        self.assertSizeOf(set(range(100)))
+        self.assertSizeOf(frozenset(range(100)))
 
     def test_empty_dict(self):
-        self.assertSizeOf(31, dict())
+        self.assertSizeOf(dict())
 
     def test_small_dict(self):
-        self.assertSizeOf(31, dict.fromkeys(range(1)))
-        self.assertSizeOf(31, dict.fromkeys(range(2)))
-        self.assertSizeOf(31, dict.fromkeys(range(3)))
-        self.assertSizeOf(31, dict.fromkeys(range(4)))
-        self.assertSizeOf(31, dict.fromkeys(range(5)))
+        self.assertSizeOf(dict.fromkeys(range(1)))
+        self.assertSizeOf(dict.fromkeys(range(2)))
+        self.assertSizeOf(dict.fromkeys(range(3)))
+        self.assertSizeOf(dict.fromkeys(range(4)))
+        self.assertSizeOf(dict.fromkeys(range(5)))
 
     def test_medium_dict(self):
-        self.assertSizeOf(31+512*3, dict.fromkeys(range(100)))
+        self.assertSizeOf(dict.fromkeys(range(100)))
 
     def test_basic_types(self):
-        type_size = 106
-        if sys.version_info[:2] >= (2, 6):
-            type_size = 109
-        self.assertSizeOf(type_size, dict)
-        self.assertSizeOf(type_size, set)
-        self.assertSizeOf(type_size, tuple)
+        self.assertSizeOf(dict)
+        self.assertSizeOf(set)
+        self.assertSizeOf(tuple)
 
     def test_user_type(self):
         class Foo(object):
             pass
-        if sys.version_info[:2] >= (2, 6):
-            self.assertSizeOf(109, Foo)
-        else:
-            self.assertSizeOf(106, Foo)
+        self.assertSizeOf(Foo)
 
     def test_simple_object(self):
-        obj = object()
-        self.assertSizeOf(2, obj, has_gc=False)
+        self.assertSizeOf(object())
 
     def test_user_instance(self):
         class Foo(object):
             pass
         # This has a pointer to a dict and a weakref list
-        f = Foo()
-        self.assertSizeOf(4, f)
+        self.assertSizeOf(Foo())
 
     def test_slotted_instance(self):
         class One(object):
             __slots__ = ['one']
         # The basic object plus memory for one member
-        self.assertSizeOf(3, One())
+        self.assertSizeOf(One())
         class Two(One):
             __slots__ = ['two']
-        self.assertSizeOf(4, Two())
+        self.assertSizeOf(Two())
 
     def test_empty_unicode(self):
-        self.assertSizeOf(6, u'', extra_size=0, has_gc=False)
+        self.assertSizeOf(u'')
 
     def test_small_unicode(self):
-        self.assertSizeOf(6, u'a', extra_size=_scanner._unicode_size*1,
-                          has_gc=False)
-        self.assertSizeOf(6, u'abcd', extra_size=_scanner._unicode_size*4,
-                          has_gc=False)
-        self.assertSizeOf(6, u'\xbe\xe5', extra_size=_scanner._unicode_size*2,
-                          has_gc=False)
+        self.assertSizeOf(u'a')
+        self.assertSizeOf(u'abcd')
+        self.assertSizeOf(u'\xbe\xe5')
 
     def test_None(self):
-        self.assertSizeOf(2, None, has_gc=False)
+        self.assertSizeOf(None)
 
     def test__sizeof__instance(self):
         # __sizeof__ appears to have been introduced in python 2.6, and
@@ -170,11 +152,11 @@ class TestSizeOf(tests.TestCase):
                 self.size = size
             def __sizeof__(self):
                 return self.size
-        self.assertSizeOf(0, CustomSize(10), 10, has_gc=True)
-        self.assertSizeOf(0, CustomSize(20), 20, has_gc=True)
+        self.assertSizeOf(CustomSize(10))
+        self.assertSizeOf(CustomSize(20))
         # If we get '-1' as the size we assume something is wrong, and fall
-        # back to the original size
-        self.assertSizeOf(4, CustomSize(-1), has_gc=True)
+        # back to the original size.  (sys.getsizeof will crash.)
+        self.assertExactSizeOf(4, CustomSize(-1), has_gc=True)
 
     def test_size_of_special(self):
         class CustomWithoutSizeof(object):
@@ -188,15 +170,15 @@ class TestSizeOf(tests.TestCase):
             return 1600
             
         obj = CustomWithoutSizeof()
-        self.assertSizeOf(4, obj)
+        self.assertExactSizeOf(4, obj)
         _scanner.add_special_size('CustomWithoutSizeof', _size_32, _size_64)
         try:
-            self.assertSizeOf(200, obj)
+            self.assertExactSizeOf(200, obj)
         finally:
             _scanner.add_special_size('CustomWithoutSizeof', None, None)
         self.assertEqual([obj], log)
         del log[:]
-        self.assertSizeOf(4, obj)
+        self.assertExactSizeOf(4, obj)
         self.assertEqual([], log)
 
     def test_size_of_special_neg1(self):
@@ -208,10 +190,10 @@ class TestSizeOf(tests.TestCase):
             log.append(obj)
             return -1
         obj = CustomWithoutSizeof()
-        self.assertSizeOf(4, obj)
+        self.assertExactSizeOf(4, obj)
         _scanner.add_special_size('CustomWithoutSizeof', _size_neg1, _size_neg1)
         try:
-            self.assertSizeOf(4, obj)
+            self.assertExactSizeOf(4, obj)
         finally:
             _scanner.add_special_size('CustomWithoutSizeof', None, None)
         self.assertEqual([obj], log)
