@@ -523,10 +523,12 @@ _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj, int recurse)
     } else if (PyType_Check(c_obj)) {
         _write_static_to_info(info, ", \"name\": ");
         _dump_json_c_string(info, ((PyTypeObject *)c_obj)->tp_name, -1);
+#if PY_VERSION_HEX < 0x03000000
     } else if (PyClass_Check(c_obj)) {
         /* Old style class */
         _write_static_to_info(info, ", \"name\": ");
         _dump_string(info, ((PyClassObject *)c_obj)->cl_name);
+#endif
     }
     if (PyString_Check(c_obj)) {
         _write_to_ref_info(info, ", \"len\": " SSIZET_FMT, PyString_GET_SIZE(c_obj));

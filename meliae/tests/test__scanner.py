@@ -18,6 +18,7 @@ import gc
 import sys
 import tempfile
 import types
+import unittest
 import zlib
 
 from meliae import (
@@ -516,6 +517,8 @@ class TestDumpInfo(tests.TestCase):
         inst = MyClass()
         self.assertDumpInfo(inst)
 
+    @unittest.skipIf(
+        sys.version_info[0] >= 3, "Python 3 does not have old-style classes")
     def test_old_style_class(self):
         class MyOldClass:
             pass
