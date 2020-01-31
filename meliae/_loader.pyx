@@ -29,8 +29,6 @@ from cpython.mem cimport (
 from cpython.object cimport (
     Py_EQ,
     PyObject,
-    PyObject_Hash,
-    PyObject_RichCompareBool,
     PyTypeObject,
     traverseproc,
     visitproc,
@@ -49,6 +47,15 @@ from cpython.tuple cimport (
 #     stderr,
 #     )
 from libc.string cimport memset
+
+cdef extern from "Python.h":
+    long PyObject_Hash(PyObject *o) except? -1
+    bint PyObject_RichCompareBool(PyObject *o1, PyObject *o2,
+                                  int opid) except -1
+
+    PyObject *PyDict_GetItem_ptr "PyDict_GetItem" (object d, PyObject *key)
+    int PyDict_SetItem_ptr "PyDict_SetItem" (object d, PyObject *key,
+                                             PyObject *val) except -1
 
 import gc
 from meliae import warn
@@ -88,11 +95,10 @@ cdef int _set_default_ptr(object d, PyObject **val) except -1:
     """Similar to _set_default, only it sets the val in place"""
     cdef PyObject *tmp
 
-    val_obj = <object>val[0]
-    tmp = PyDict_GetItem(d, val_obj)
+    tmp = PyDict_GetItem_ptr(d, val[0])
     if tmp == NULL:
         # val is unchanged, so we don't change the refcounts
-        PyDict_SetItem(d, val_obj, val_obj)
+        PyDict_SetItem_ptr(d, val[0], val[0])
         return 0
     else:
         # We will be pointing val to something new, so fix up the refcounts
@@ -709,8 +715,10 @@ cdef class MemObjectCollection:
         cdef _MemObject **table
         cdef _MemObject **slot
         cdef _MemObject **free_slot
+        cdef PyObject *py_addr
 
-        the_hash = PyObject_Hash(address)
+        py_addr = <PyObject *>address
+        the_hash = PyObject_Hash(py_addr)
         i = <size_t>the_hash
         mask = self._table_mask
         table = self._table
@@ -727,13 +735,12 @@ cdef class MemObjectCollection:
             elif slot[0] == _dummy:
                 if free_slot == NULL:
                     free_slot = slot
-            elif slot[0].address == <PyObject *>address:
+            elif slot[0].address == py_addr:
                 # Found an exact pointer to the key
                 return slot
             elif slot[0].address == NULL:
                 raise RuntimeError('Found a non-empty slot with null address')
-            elif PyObject_RichCompareBool(<object>slot[0].address, address,
-                                          Py_EQ):
+            elif PyObject_RichCompareBool(slot[0].address, py_addr, Py_EQ):
                 # Both py_key and cur belong in this slot, return it
                 return slot
             i = i + 1 + n_lookup
@@ -838,7 +845,7 @@ cdef class MemObjectCollection:
 
         assert entry != NULL and entry.address != NULL
         mask = <size_t>self._table_mask
-        the_hash = <size_t>PyObject_Hash(<object>entry.address)
+        the_hash = <size_t>PyObject_Hash(entry.address)
         i = <size_t>the_hash
         for n_lookup from 0 <= n_lookup < mask:
             slot = &self._table[i & mask]
