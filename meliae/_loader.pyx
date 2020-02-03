@@ -14,41 +14,48 @@
 
 """Routines and objects for loading dump files."""
 
+from cpython.dict cimport (
+    PyDict_GetItem,
+    PyDict_SetItem,
+    )
+from cpython.list cimport (
+    PyList_New,
+    PyList_SET_ITEM,
+    )
+from cpython.mem cimport (
+    PyMem_Free,
+    PyMem_Malloc,
+    )
+from cpython.object cimport (
+    Py_EQ,
+    PyObject,
+    PyTypeObject,
+    traverseproc,
+    visitproc,
+    )
+from cpython.ref cimport (
+    Py_INCREF,
+    Py_XDECREF,
+    Py_XINCREF,
+    )
+from cpython.tuple cimport (
+    PyTuple_New,
+    PyTuple_SET_ITEM,
+    )
+# from libc.stdio cimport (
+#     fprintf,
+#     stderr,
+#     )
+from libc.string cimport memset
+
 cdef extern from "Python.h":
-    ctypedef unsigned long size_t
-    ctypedef struct PyObject:
-        pass
-    PyObject *Py_None
-    void *PyMem_Malloc(size_t)
-    void PyMem_Free(void *)
+    long PyObject_Hash(PyObject *o) except? -1
+    bint PyObject_RichCompareBool(PyObject *o1, PyObject *o2,
+                                  int opid) except -1
 
-    ctypedef int (*visitproc)(PyObject *, void *)
-    ctypedef int (*traverseproc)(PyObject *, visitproc, void *)
-    ctypedef struct PyTypeObject:
-        # hashfunc tp_hash
-        # richcmpfunc tp_richcompare
-        traverseproc tp_traverse
-
-    long PyObject_Hash(PyObject *) except -1
-
-    object PyList_New(Py_ssize_t)
-    void PyList_SET_ITEM(object, Py_ssize_t, object)
-    PyObject *PyDict_GetItem(object d, object key)
     PyObject *PyDict_GetItem_ptr "PyDict_GetItem" (object d, PyObject *key)
-    int PyDict_SetItem(object d, object key, object val) except -1
     int PyDict_SetItem_ptr "PyDict_SetItem" (object d, PyObject *key,
                                              PyObject *val) except -1
-    void Py_INCREF(PyObject*)
-    void Py_XDECREF(PyObject*)
-    void Py_DECREF(PyObject*)
-    object PyTuple_New(Py_ssize_t)
-    object PyTuple_SET_ITEM(object, Py_ssize_t, object)
-    int PyObject_RichCompareBool(PyObject *, PyObject *, int) except -1
-    int Py_EQ
-    void memset(void *, int, size_t)
-
-    # void fprintf(void *, char *, ...)
-    # void *stderr
 
 import gc
 from meliae import warn
@@ -95,8 +102,8 @@ cdef int _set_default_ptr(object d, PyObject **val) except -1:
         return 0
     else:
         # We will be pointing val to something new, so fix up the refcounts
-        Py_INCREF(tmp)
-        Py_DECREF(val[0])
+        Py_XINCREF(tmp)
+        Py_XDECREF(val[0])
         val[0] = tmp
         return 1
 
@@ -110,7 +117,7 @@ cdef int _free_ref_list(RefList *ref_list) except -1:
     for i from 0 <= i < ref_list.size:
         if ref_list.refs[i] == NULL:
             raise RuntimeError('Somehow we got a NULL reference.')
-        Py_DECREF(ref_list.refs[i])
+        Py_XDECREF(ref_list.refs[i])
     PyMem_Free(ref_list)
     return 1
 
@@ -147,7 +154,7 @@ cdef RefList *_list_to_ref_list(object refs) except? NULL:
     i = 0
     for ref in refs:
         ref_list.refs[i] = <PyObject*>ref
-        Py_INCREF(ref_list.refs[i])
+        Py_XINCREF(ref_list.refs[i])
         i = i + 1
     return ref_list
 
@@ -205,10 +212,10 @@ cdef _MemObject *_new_mem_object(address, type_str, size, children,
         raise MemoryError('Failed to allocate %d bytes' % (sizeof(_MemObject),))
     memset(new_entry, 0, sizeof(_MemObject))
     addr = <PyObject *>address
-    Py_INCREF(addr)
+    Py_XINCREF(addr)
     new_entry.address = addr
     new_entry.type_str = <PyObject *>type_str
-    Py_INCREF(new_entry.type_str)
+    Py_XINCREF(new_entry.type_str)
     new_entry.size = size
     new_entry.child_list = _list_to_ref_list(children)
     # TODO: Was found wanting and removed
@@ -223,7 +230,7 @@ cdef _MemObject *_new_mem_object(address, type_str, size, children,
         new_entry.value = <PyObject *>value
     else:
         new_entry.value = <PyObject *>name
-    Py_INCREF(new_entry.value)
+    Py_XINCREF(new_entry.value)
     new_entry.parent_list = _list_to_ref_list(parent_list)
     new_entry.total_size = total_size
     return new_entry
@@ -355,8 +362,8 @@ cdef class _MemObjectProxy:
         def __set__(self, value):
             cdef PyObject *ptr
             ptr = <PyObject *>value
-            Py_INCREF(ptr)
-            Py_DECREF(self._obj.type_str)
+            Py_XINCREF(ptr)
+            Py_XDECREF(self._obj.type_str)
             self._obj.type_str = ptr
 
     property size:
@@ -380,9 +387,9 @@ cdef class _MemObjectProxy:
         def __set__(self, value):
             cdef PyObject *new_val
             new_val = <PyObject *>value
-            # INCREF first, just in case value is self._obj.value
-            Py_INCREF(new_val)
-            Py_DECREF(self._obj.value)
+            # XINCREF first, just in case value is self._obj.value
+            Py_XINCREF(new_val)
+            Py_XDECREF(self._obj.value)
             self._obj.value = new_val
 
     property total_size:
@@ -545,7 +552,7 @@ cdef class _MemObjectProxy:
             parent_str = ''
         else:
             parent_str = ' %dpar' % (self._obj.parent_list.size,)
-        if self._obj.value == NULL or self._obj.value == Py_None:
+        if self._obj.value == NULL or self._obj.value == <PyObject *>None:
             val = ''
         else:
             val = ' %r' % (<object>self._obj.value,)
@@ -982,7 +989,7 @@ cdef class MemObjectCollection:
                     proxy = self._proxy_for(address, cur)
                     item = (address, proxy)
                     # SET_ITEM steals a reference
-                    Py_INCREF(<PyObject *>item)
+                    Py_INCREF(item)
                     PyList_SET_ITEM(values, out_idx, item)
                     out_idx += 1
         finally:

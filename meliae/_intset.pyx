@@ -17,12 +17,12 @@
 (Such as a set of python object ids.)
 """
 
-cdef extern from *:
-    ctypedef unsigned long size_t
-    void *malloc(size_t)
-    void *realloc(void *, size_t)
-    void free(void *)
-    void memset(void *, int, size_t)
+from libc.stdlib cimport (
+    free,
+    malloc,
+    realloc,
+    )
+from libc.string cimport memset
 
 
 ctypedef Py_ssize_t int_type
