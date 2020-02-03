@@ -14,10 +14,6 @@
 
 """Routines and objects for loading dump files."""
 
-from cpython.dict cimport (
-    PyDict_GetItem,
-    PyDict_SetItem,
-    )
 from cpython.list cimport (
     PyList_New,
     PyList_SET_ITEM,
@@ -73,26 +69,13 @@ cdef Py_ssize_t sizeof_RefList(RefList *val):
     return sizeof(long) + (sizeof(PyObject *) * val.size)
 
 
-cdef object _set_default(object d, object val):
+cdef int _set_default_ptr(object d, PyObject **val) except -1:
     """Either return the value in the dict, or return 'val'.
 
     This is the same as Dict.setdefault, but without the attribute lookups. (It
-    may be slightly worse because it does 2 dict lookups?)
+    may be slightly worse because it does 2 dict lookups?) It sets the value in
+    place, avoiding unnecessary refcount changes.
     """
-    cdef PyObject *tmp
-
-    # TODO: Note that using _lookup directly would remove the need to ever do a
-    #       double-lookup to set the value
-    tmp = PyDict_GetItem(d, val)
-    if tmp == NULL:
-        PyDict_SetItem(d, val, val)
-    else:
-        val = <object>tmp
-    return val
-
-
-cdef int _set_default_ptr(object d, PyObject **val) except -1:
-    """Similar to _set_default, only it sets the val in place"""
     cdef PyObject *tmp
 
     tmp = PyDict_GetItem_ptr(d, val[0])
@@ -157,27 +140,6 @@ cdef RefList *_list_to_ref_list(object refs) except? NULL:
         Py_XINCREF(ref_list.refs[i])
         i = i + 1
     return ref_list
-
-
-cdef object _format_list(RefList *ref_list):
-    cdef long i, max_refs
-
-    if ref_list == NULL:
-        return ''
-    max_refs = ref_list.size
-    if max_refs > 10:
-        max_refs = 10
-    ref_str = ['[']
-    for i from 0 <= i < max_refs:
-        if i == 0:
-            ref_str.append('%d' % (<object>ref_list.refs[i]))
-        else:
-            ref_str.append(', %d' % (<object>ref_list.refs[i]))
-    if ref_list.size > 10:
-        ref_str.append(', ...]')
-    else:
-        ref_str.append(']')
-    return ''.join(ref_str)
 
 
 cdef struct _MemObject:
