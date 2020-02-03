@@ -14,7 +14,11 @@
 
 """The core routines for scanning python references and dumping memory info."""
 
-from cpython.string cimport PyString_FromStringAndSize
+from cpython.object cimport PyObject_AsFileDescriptor
+from libc.errno cimport (
+    EINTR,
+    errno,
+    )
 from libc.stdio cimport (
     fflush,
     FILE,
@@ -22,10 +26,10 @@ from libc.stdio cimport (
     fwrite,
     stderr,
     )
+from posix.unistd cimport write
 
 
 cdef extern from "Python.h":
-    FILE *PyFile_AsFile(object)
     int Py_UNICODE_SIZE
     ctypedef struct PyGC_Head:
         pass
@@ -38,7 +42,7 @@ cdef extern from "_scanner_core.h":
                    size_t len)
 
     void _clear_last_dumped()
-    void _dump_object_info(object out,
+    void _dump_object_info(write_callback write, void *callee_data,
                            object c_obj, object nodump, int recurse)
     object _get_referents(object c_obj)
     object _get_special_case_dict()
@@ -62,12 +66,35 @@ def size_of(obj):
     return _size_of(obj)
 
 
+cdef void _fd_callback(void *callee_data, char *bytes, size_t len):
+    cdef int fd
+    cdef ssize_t n
+
+    fd = (<int *>callee_data)[0]
+    while len:
+        n = write(fd, bytes, len)
+        if n >= 0:
+            bytes += n
+            len -= n
+        elif errno != EINTR:
+            # XXX: We have no way to signal an error here at the moment.
+            return
+
+
+cdef void _callable_callback(void *callee_data, char *bytes, size_t len):
+    callable = <object>callee_data
+
+    s = bytes[:len]
+    callable(s)
+
+
 def dump_object_info(object out, object obj, object nodump=None,
                      int recurse_depth=1):
     """Dump the object information to the given output.
 
     :param out: Either a File object, or a callable.
-        If a File object, we will write bytes to the underlying FILE*
+        If a File object, we will write bytes to the underlying file
+        descriptor.
         Otherwise, we will call(str) with bytes as we build up the state of the
         object. Note that a single call will not be a complete description, but
         potentially a single character of the final formatted string.
@@ -79,7 +106,16 @@ def dump_object_info(object out, object obj, object nodump=None,
        referenced (such as strings).
        2 dump everything we find and continue recursing
     """
-    _dump_object_info(out, obj, nodump, recurse_depth)
+    cdef int fd_out
+
+    try:
+        fd_out = PyObject_AsFileDescriptor(out)
+    except TypeError:
+        _dump_object_info(<write_callback>_callable_callback, <void *>out, obj,
+                          nodump, recurse_depth)
+    else:
+        _dump_object_info(<write_callback>_fd_callback, &fd_out, obj,
+                          nodump, recurse_depth)
     _clear_last_dumped()
 
 
