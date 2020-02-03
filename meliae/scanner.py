@@ -17,6 +17,8 @@
 import gc
 import types
 
+import six
+
 from meliae import (
     _intset,
     _scanner,
@@ -41,7 +43,7 @@ add_special_size("numpy.ndarray", _size_of_ndarray, _size_of_ndarray)
 
 def dump_all_referenced(outf, obj, is_pending=False):
     """Recursively dump everything that is referenced from obj."""
-    if isinstance(outf, basestring):
+    if isinstance(outf, six.string_types):
         outf = open(outf, 'wb')
     if is_pending:
         pending = obj
@@ -79,7 +81,7 @@ def dump_all_referenced(outf, obj, is_pending=False):
 def dump_gc_objects(outf, recurse_depth=1):
     """Dump everything that is available via gc.get_objects().
     """
-    if isinstance(outf, basestring):
+    if isinstance(outf, six.string_types):
         opened = True
         outf = open(outf, 'wb')
     else:
@@ -130,7 +132,7 @@ def dump_all_objects(outf):
     This also can be faster, because it doesn't dump the same item multiple
     times.
     """
-    if isinstance(outf, basestring):
+    if isinstance(outf, six.string_types):
         opened = True
         outf = open(outf, 'wb')
     else:
