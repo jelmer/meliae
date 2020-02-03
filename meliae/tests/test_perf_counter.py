@@ -15,6 +15,8 @@
 import subprocess
 import sys
 
+import six
+
 from meliae import (
     perf_counter,
     tests,
@@ -89,8 +91,8 @@ class TestPerformanceCounter(tests.TestCase):
 	if cur_mem is None or peak_mem is None:
 	    # fail gracefully, though we may want a stronger assertion here
 	    return
-        self.assertTrue(isinstance(cur_mem, (int, long)))
-        self.assertTrue(isinstance(peak_mem, (int, long)))
+        self.assertTrue(isinstance(cur_mem, six.integer_types))
+        self.assertTrue(isinstance(peak_mem, six.integer_types))
         p.stdin.write('post')
         p.stdin.flush()
         p.stdout.read()

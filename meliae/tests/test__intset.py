@@ -16,6 +16,8 @@
 
 import sys
 
+import six
+
 from meliae import (
     _intset,
     _scanner,
@@ -87,7 +89,7 @@ class TestIntSet(tests.TestCase):
 
     def test_add_and_grow(self):
         iset = self._set_type()
-        for i in xrange(0, 10000):
+        for i in range(0, 10000):
             iset.add(i)
         self.assertEqual(10000, len(iset))
 
@@ -148,8 +150,9 @@ class TestIDSet(TestIntSet):
         # integers are considered to be signed longs. As such, we need to play
         # some tricks to get them to fit properly. Otherwise we get
         # 'Overflow' exceptions
-        bigint = sys.maxint + 1
-        self.assertTrue(isinstance(bigint, long))
+        bigint = six.MAXSIZE + 1
+        self.assertTrue(
+            isinstance(bigint, int if sys.version_info[0] >= 3 else long))
         iset = self._set_type()
         self.assertFalse(bigint in iset)
         iset.add(bigint)

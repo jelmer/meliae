@@ -17,12 +17,12 @@
 (Such as a set of python object ids.)
 """
 
-cdef extern from *:
-    ctypedef unsigned long size_t
-    void *malloc(size_t)
-    void *realloc(void *, size_t)
-    void free(void *)
-    void memset(void *, int, size_t)
+from libc.stdlib cimport (
+    free,
+    malloc,
+    realloc,
+    )
+from libc.string cimport memset
 
 
 ctypedef Py_ssize_t int_type
@@ -85,7 +85,8 @@ cdef class IntSet:
     cdef int_type *_lookup(self, int_type c_val) except NULL:
         """Taken from the set() algorithm."""
         cdef size_t offset, perturb
-        cdef int_type *entry, *freeslot
+        cdef int_type *entry
+        cdef int_type *freeslot
 
         if self._array == NULL:
             raise RuntimeError('cannot _lookup without _array allocated.')
@@ -145,7 +146,8 @@ cdef class IntSet:
     cdef int _grow(self) except -1:
         cdef int i
         cdef Py_ssize_t old_mask, old_size, new_size, old_count
-        cdef int_type *old_array, val
+        cdef int_type *old_array
+        cdef int_type val
 
         old_mask = self._mask
         old_size = old_mask + 1
@@ -244,7 +246,8 @@ cdef class IDSet(IntSet):
     cdef int_type *_lookup(self, int_type c_val) except NULL:
         """Taken from the set() algorithm."""
         cdef size_t offset, perturb
-        cdef int_type *entry, *freeslot
+        cdef int_type *entry
+        cdef int_type *freeslot
         cdef int_type internal_val
 
         if self._array == NULL:

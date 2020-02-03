@@ -28,6 +28,7 @@ try:
     import simplejson
 except ImportError:
     simplejson = None
+import six
 
 from meliae import (
     files,
@@ -173,7 +174,7 @@ class _ObjSummary(object):
             ' Index   Count   %      Size   % Cum     Max Kind'
             ]
         cumulative = 0
-        for i in xrange(min(20, len(self.summaries))):
+        for i in range(min(20, len(self.summaries))):
             summary = self.summaries[i]
             cumulative += summary.total_size
             out.append(
@@ -267,7 +268,7 @@ class ObjManager(object):
                     t = type(refs)
                     if refs is None:
                         refs = address
-                    elif t in (int, long):
+                    elif t in six.integer_types:
                         refs = (refs, address)
                     elif t is tuple:
                         if len(refs) >= 5:
@@ -314,7 +315,7 @@ class ObjManager(object):
                 else:
                     if refs is None:
                         obj.parents = ()
-                    elif type(refs) in (int, long):
+                    elif type(refs) in six.integer_types:
                         obj.parents = (refs,)
                     else:
                         # We use a set() to remove duplicate parents
@@ -496,7 +497,7 @@ class ObjManager(object):
                 continue
             # We avoid calling o.children so that we don't have to create
             # proxies for all objects
-            for i in xrange(0, o_len, 2):
+            for i in range(0, o_len, 2):
                 # Technically, o[i].address == o[i+1].address, but the proxy
                 # objects are smart enough to get reused...
                 c_i = o[i]
@@ -525,7 +526,7 @@ def load(source, using_json=None, show_prog=True, collapse=True,
     :param max_parents: See ObjManager.__init__(max_parents)
     """
     cleanup = None
-    if isinstance(source, str):
+    if isinstance(source, basestring):
         source, cleanup = files.open_file(source)
         if isinstance(source, file):
             input_size = os.fstat(source.fileno()).st_size

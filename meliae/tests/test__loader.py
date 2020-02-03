@@ -14,6 +14,8 @@
 
 """Pyrex extension for tracking loaded objects"""
 
+import sys
+
 from meliae import (
     _loader,
     _scanner,
@@ -51,7 +53,10 @@ class TestMemObjectCollection(tests.TestCase):
         self.assertEqual(255, moc._test_lookup(255))
         self.assertEqual(933, moc._test_lookup(933))
         self.assertEqual(933, moc._test_lookup(933+1024))
-        self.assertEqual(933, moc._test_lookup(933L+1024L))
+        if sys.version_info[0] < 3:
+            # 1024L was more idiomatic in Python 2, but is a syntax error in
+            # Python 3.
+            self.assertEqual(933, moc._test_lookup(long(933)+long(1024)))
 
     def test__len__(self):
         moc = _loader.MemObjectCollection()
@@ -132,7 +137,7 @@ class TestMemObjectCollection(tests.TestCase):
 
     def test_add_until_resize(self):
         moc = _loader.MemObjectCollection()
-        for i in xrange(1025):
+        for i in range(1025):
             moc.add(i, 'foo', 100+i)
         self.assertEqual(1025, moc._filled)
         self.assertEqual(1025, moc._active)
@@ -431,12 +436,11 @@ class Test_MemObjectProxy(tests.TestCase):
             return mop[idx]
         try:
             mop[2]
-        except IndexError, e:
-            e = e
+        except IndexError as e:
+            self.assertEqual('%s has only 2 (not 3) references' % (mop,),
+                             str(e))
         else:
             self.fail("IndexError not raised")
-        self.assertEqual('%s has only 2 (not 3) references' % (mop,),
-                         str(e))
 
     def test__getitem__too_negative(self):
         mop = self.moc.add(1234567, 'type', 256, children=[0, 255])
@@ -444,11 +448,10 @@ class Test_MemObjectProxy(tests.TestCase):
             return mop[idx]
         try:
             mop[-3]
-        except IndexError, e:
-            e = e
+        except IndexError as e:
+            self.assertEqual('ref index -3 out of range', str(e))
         else:
             self.fail("IndexError not raised")
-        self.assertEqual('ref index -3 out of range', str(e))
 
     def test_total_size(self):
         mop = self.moc[0]

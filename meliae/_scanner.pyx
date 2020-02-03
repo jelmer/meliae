@@ -14,14 +14,15 @@
 
 """The core routines for scanning python references and dumping memory info."""
 
-cdef extern from "stdio.h":
-    ctypedef long size_t
-    ctypedef struct FILE:
-        pass
-    FILE *stderr
-    size_t fwrite(void *, size_t, size_t, FILE *)
-    size_t fprintf(FILE *, char *, ...)
-    void fflush(FILE *)
+from cpython.string cimport PyString_FromStringAndSize
+from libc.stdio cimport (
+    fflush,
+    FILE,
+    fprintf,
+    fwrite,
+    stderr,
+    )
+
 
 cdef extern from "Python.h":
     FILE *PyFile_AsFile(object)

@@ -41,7 +41,7 @@ add_special_size("numpy.ndarray", _size_of_ndarray, _size_of_ndarray)
 
 def dump_all_referenced(outf, obj, is_pending=False):
     """Recursively dump everything that is referenced from obj."""
-    if isinstance(outf, str):
+    if isinstance(outf, basestring):
         outf = open(outf, 'wb')
     if is_pending:
         pending = obj
@@ -89,8 +89,8 @@ def dump_gc_objects(outf, recurse_depth=1):
     # Dump out a few specific objects, so they don't get repeated forever
     nodump = [None, True, False]
     # In current versions of python, these are all pre-cached
-    nodump.extend(xrange(-5, 256))
-    nodump.extend([chr(c) for c in xrange(256)])
+    nodump.extend(range(-5, 256))
+    nodump.extend([chr(c) for c in range(256)])
     nodump.extend([t for t in types.__dict__.itervalues()
                       if type(t) is types.TypeType])
     nodump.extend([set, dict])
