@@ -14,12 +14,15 @@
 
 """Tests for the object scanner."""
 
+import binascii
 import gc
 import sys
 import tempfile
 import types
 import unittest
 import zlib
+
+import six
 
 from meliae import (
     _scanner,
@@ -214,29 +217,32 @@ class TestSizeOf(tests.TestCase):
         self.assertEqual(0, _scanner.size_of(d) % _scanner._word_size)
 
 
-def _string_to_json(s):
+def _bytes_to_json(s):
     out = ['"']
-    for c in s:
-        if c <= '\x1f' or c > '\x7e':
-            out.append(r'\u%04x' % ord(c))
-        elif c in r'\/"':
+    simple_escapes = [ord(c) for c in r'\/"']
+    for c in six.iterbytes(s):
+        if c <= 31 or c > 126:
+            out.append(r'\u%04x' % c)
+        elif c in simple_escapes:
             # Simple escape
-            out.append('\\' + c)
+            out.append('\\' + chr(c))
         else:
-            out.append(c)
+            out.append(chr(c))
     out.append('"')
     return ''.join(out)
 
 
-def _unicode_to_json(u):
+def _text_to_json(u):
     out = ['"']
     for c in u:
         if c > u'\uffff':
-            surrogate = c.encode('utf_16_be').encode('hex')
+            surrogate = binascii.b2a_hex(c.encode('utf_16_be'))
+            if not isinstance(surrogate, str):  # Python 3
+                surrogate = surrogate.decode('ASCII')
             out.append(r'\u%s\u%s' % (surrogate[:4], surrogate[4:]))
         elif c <= u'\u001f' or c > u'\u007e':
             out.append(r'\u%04x' % ord(c))
-        elif c in ur'\/"':
+        elif c in u'\\/"':
             # Simple escape
             out.append('\\' + str(c))
         else:
@@ -245,47 +251,51 @@ def _unicode_to_json(u):
     return ''.join(out)
 
 
-class TestJSONString(tests.TestCase):
+_str_to_json = _text_to_json if sys.version_info[0] >= 3 else _bytes_to_json
 
-    def assertJSONString(self, exp, input):
-        self.assertEqual(exp, _string_to_json(input))
 
-    def test_empty_string(self):
-        self.assertJSONString('""', '')
+class TestJSONBytes(tests.TestCase):
 
-    def test_simple_strings(self):
-        self.assertJSONString('"foo"', 'foo')
-        self.assertJSONString('"aoeu aoeu"', 'aoeu aoeu')
+    def assertJSONBytes(self, exp, input):
+        self.assertEqual(exp, _bytes_to_json(input))
+
+    def test_empty_bytes(self):
+        self.assertJSONBytes('""', b'')
+
+    def test_simple_bytes(self):
+        self.assertJSONBytes('"foo"', b'foo')
+        self.assertJSONBytes('"aoeu aoeu"', b'aoeu aoeu')
 
     def test_simple_escapes(self):
-        self.assertJSONString(r'"\\x\/y\""', r'\x/y"')
+        self.assertJSONBytes(r'"\\x\/y\""', br'\x/y"')
 
     def test_control_escapes(self):
-        self.assertJSONString(r'"\u0000\u0001\u0002\u001f"', '\x00\x01\x02\x1f')
+        self.assertJSONBytes(
+            r'"\u0000\u0001\u0002\u001f"', b'\x00\x01\x02\x1f')
 
 
-class TestJSONUnicode(tests.TestCase):
+class TestJSONText(tests.TestCase):
 
-    def assertJSONUnicode(self, exp, input):
-        val = _unicode_to_json(input)
+    def assertJSONText(self, exp, input):
+        val = _text_to_json(input)
         self.assertEqual(exp, val)
         self.assertTrue(isinstance(val, str))
 
     def test_empty(self):
-        self.assertJSONUnicode('""', u'')
+        self.assertJSONText('""', u'')
 
     def test_ascii_chars(self):
-        self.assertJSONUnicode('"abcdefg"', u'abcdefg')
+        self.assertJSONText('"abcdefg"', u'abcdefg')
 
     def test_unicode_chars(self):
-        self.assertJSONUnicode(r'"\u0012\u00b5\u2030\u001f"',
-                               u'\x12\xb5\u2030\x1f')
+        self.assertJSONText(r'"\u0012\u00b5\u2030\u001f"',
+                            u'\x12\xb5\u2030\x1f')
 
     def test_simple_escapes(self):
-        self.assertJSONUnicode(r'"\\x\/y\""', ur'\x/y"')
+        self.assertJSONText(r'"\\x\/y\""', u'\\x/y"')
 
     def test_non_bmp(self):
-        self.assertJSONUnicode(r'"\ud808\udf45"', u"\U00012345")
+        self.assertJSONText(r'"\ud808\udf45"', u"\U00012345")
 
 
 # A pure python implementation of dump_object_info
@@ -298,18 +308,18 @@ def _py_dump_json_obj(obj):
         '{"address": %d'
         ', "type": %s'
         ', "size": %d'
-        ) % (id(obj), _string_to_json(klass.__name__),
+        ) % (id(obj), _str_to_json(klass.__name__),
              _scanner.size_of(obj))
         ]
     name = getattr(obj, '__name__', None)
     if name is not None:
-        content.append(', "name": %s' % (_string_to_json(name),))
+        content.append(', "name": %s' % (_str_to_json(name),))
     if getattr(obj, '__len__', None) is not None:
         content.append(', "len": %s' % (len(obj),))
-    if isinstance(obj, str):
-        content.append(', "value": %s' % (_string_to_json(obj[:100]),))
-    elif isinstance(obj, unicode):
-        content.append(', "value": %s' % (_unicode_to_json(obj[:100]),))
+    if isinstance(obj, bytes):
+        content.append(', "value": %s' % (_bytes_to_json(obj[:100]),))
+    elif isinstance(obj, six.text_type):
+        content.append(', "value": %s' % (_text_to_json(obj[:100]),))
     elif obj is True:
         content.append(', "value": "True"')
     elif obj is False:
@@ -318,7 +328,6 @@ def _py_dump_json_obj(obj):
         content.append(', "value": %d' % (obj,))
     elif isinstance(obj, types.FrameType):
         content.append(', "value": "%s"' % (obj.f_code.co_name,))
-    first = True
     content.append(', "refs": [')
     ref_strs = []
     for ref in gc.get_referents(obj):
@@ -326,16 +335,16 @@ def _py_dump_json_obj(obj):
     content.append(', '.join(ref_strs))
     content.append(']')
     content.append('}\n')
-    return ''.join(content)
+    return ''.join(content).encode('UTF-8')
 
 
 def py_dump_object_info(obj, nodump=None):
     if nodump is not None:
         if obj is nodump:
-            return ''
+            return b''
         try:
             if obj in nodump:
-                return ''
+                return b''
         except TypeError:
             # This is probably an 'unhashable' object, which means it can't be
             # put into a set, and thus we are sure it isn't in the 'nodump'
@@ -345,45 +354,47 @@ def py_dump_object_info(obj, nodump=None):
     # Now we walk again, for certain types we dump them directly
     child_vals = []
     for ref in gc.get_referents(obj):
-        if (isinstance(ref, (str, unicode, int, types.CodeType))
+        if (isinstance(ref, (six.string_types, int, types.CodeType))
             or ref is None
             or type(ref) is object):
             # These types have no traverse func, so we dump them right away
             if nodump is None or ref not in nodump:
                 child_vals.append(_py_dump_json_obj(ref))
-    return obj_info + ''.join(child_vals)
+    return obj_info + b''.join(child_vals)
 
 
 class TestPyDumpJSONObj(tests.TestCase):
 
-    def assertDumpText(self, expected, obj):
+    def assertDumpBytes(self, expected, obj):
+        if not isinstance(expected, bytes):
+            expected = expected.encode('UTF-8')
         self.assertEqual(expected, _py_dump_json_obj(obj))
 
-    def test_str(self):
-        mystr = 'a string'
-        self.assertDumpText(
-            '{"address": %d, "type": "str", "size": %d, "len": 8'
+    def test_bytes(self):
+        mystr = b'a string'
+        self.assertDumpBytes(
+            '{"address": %d, "type": "%s", "size": %d, "len": 8'
             ', "value": "a string", "refs": []}\n'
-            % (id(mystr), _scanner.size_of(mystr)),
+            % (id(mystr), bytes.__name__, _scanner.size_of(mystr)),
             mystr)
-        mystr = 'a \\str/with"control'
-        self.assertDumpText(
-            '{"address": %d, "type": "str", "size": %d, "len": 19'
+        mystr = b'a \\str/with"control'
+        self.assertDumpBytes(
+            '{"address": %d, "type": "%s", "size": %d, "len": 19'
             ', "value": "a \\\\str\\/with\\"control", "refs": []}\n'
-            % (id(mystr), _scanner.size_of(mystr)),
+            % (id(mystr), bytes.__name__, _scanner.size_of(mystr)),
             mystr)
 
     def test_unicode(self):
         myu = u'a \xb5nicode'
-        self.assertDumpText(
-            '{"address": %d, "type": "unicode", "size": %d'
+        self.assertDumpBytes(
+            '{"address": %d, "type": "%s", "size": %d'
             ', "len": 9, "value": "a \\u00b5nicode", "refs": []}\n' % (
-                id(myu), _scanner.size_of(myu)),
+                id(myu), six.text_type.__name__, _scanner.size_of(myu)),
             myu)
 
     def test_obj(self):
         obj = object()
-        self.assertDumpText(
+        self.assertDumpBytes(
             '{"address": %d, "type": "object", "size": %d, "refs": []}\n'
             % (id(obj), _scanner.size_of(obj)), obj)
 
@@ -391,14 +402,14 @@ class TestPyDumpJSONObj(tests.TestCase):
         a = object()
         b = object()
         t = (a, b)
-        self.assertDumpText(
+        self.assertDumpBytes(
             '{"address": %d, "type": "tuple", "size": %d'
             ', "len": 2, "refs": [%d, %d]}\n'
             % (id(t), _scanner.size_of(t), id(b), id(a)), t)
 
     def test_module(self):
         m = _scanner
-        self.assertDumpText(
+        self.assertDumpBytes(
             '{"address": %d, "type": "module", "size": %d'
             ', "name": "meliae._scanner", "refs": [%d]}\n'
             % (id(m), _scanner.size_of(m), id(m.__dict__)), m)
@@ -406,11 +417,11 @@ class TestPyDumpJSONObj(tests.TestCase):
     def test_bool(self):
         a = True
         b = False
-        self.assertDumpText(
+        self.assertDumpBytes(
             '{"address": %d, "type": "bool", "size": %d'
             ', "value": "True", "refs": []}\n'
             % (id(a), _scanner.size_of(a)), a)
-        self.assertDumpText(
+        self.assertDumpBytes(
             '{"address": %d, "type": "bool", "size": %d'
             ', "value": "False", "refs": []}\n'
             % (id(b), _scanner.size_of(b)), b)
@@ -431,7 +442,7 @@ class TestDumpInfo(tests.TestCase):
         self.assertEqual(py_dump_object_info(obj, nodump=nodump), as_bytes)
         as_list = []
         _scanner.dump_object_info(as_list.append, obj, nodump=nodump)
-        self.assertEqual(as_bytes, ''.join(as_list))
+        self.assertEqual(as_bytes, b''.join(as_list))
 
     def test_dump_int(self):
         self.assertDumpInfo(1)
