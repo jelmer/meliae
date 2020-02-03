@@ -133,11 +133,14 @@ _size_of_from__sizeof__(PyObject *c_obj)
     Py_ssize_t size = -1;
 
     if (PyType_CheckExact(c_obj)) {
-        // Types themselves may have a __sizeof__ attribute, but it is the
-        // unbound method, which takes an instance
-        return -1;
+	// Types themselves may have a __sizeof__ attribute, but it is the
+	// unbound method, which takes an instance; so we need to take care
+	// to use type.__sizeof__ instead.
+        size_obj = PyObject_CallMethod(
+            (PyObject *)&PyType_Type, "__sizeof__", "O", c_obj);
+    } else {
+        size_obj = PyObject_CallMethod(c_obj, "__sizeof__", NULL);
     }
-    size_obj = PyObject_CallMethod(c_obj, "__sizeof__", NULL);
     if (size_obj == NULL) {
         // Not sure what happened, but this won't work, it could be a simple
         // attribute error, or it could be something else.
@@ -172,6 +175,7 @@ _size_of_set(PySetObject *c_obj)
 }
 
 
+#if PY_VERSION_HEX < 0x03000000
 static Py_ssize_t
 _size_of_dict(PyDictObject *c_obj)
 {
@@ -192,6 +196,7 @@ _size_of_unicode(PyUnicodeObject *c_obj)
     size += Py_UNICODE_SIZE * (c_obj->length + 1);
     return size;
 }
+#endif
 
 static Py_ssize_t
 _size_of_from_specials(PyObject *c_obj)
@@ -248,12 +253,19 @@ _size_of(PyObject *c_obj)
         return _size_of_list((PyListObject *)c_obj);
     } else if PyAnySet_Check(c_obj) {
         return _size_of_set((PySetObject *)c_obj);
+#if PY_VERSION_HEX < 0x03000000
+    /* Only use these optimisations for Python 2.x.  Dicts and Unicode
+     * objects were both rearranged in various 3.x versions, and we don't
+     * want to have to keep track of the details; in any case, they
+     * implement __sizeof__ (as in 2.x).
+     */
     } else if PyDict_Check(c_obj) {
         return _size_of_dict((PyDictObject *)c_obj);
     } else if PyUnicode_Check(c_obj) {
         return _size_of_unicode((PyUnicodeObject *)c_obj);
+#endif
     } else if (PyTuple_CheckExact(c_obj)
-            || PyString_CheckExact(c_obj)
+            || PyBytes_CheckExact(c_obj)
 #if PY_VERSION_HEX < 0x03000000
             || PyInt_CheckExact(c_obj)
 #endif
