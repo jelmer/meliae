@@ -410,12 +410,32 @@ _dump_unicode(struct ref_info *info, PyObject *c_obj)
 {
     // TODO: consider writing to a small memory buffer, before writing to disk
     Py_ssize_t uni_size;
-    Py_UNICODE *uni_buf, c;
     Py_ssize_t i;
     char out_buf[1024] = {0}, *ptr, *end;
+#if PY_VERSION_HEX >= 0x03030000
+    int uni_kind;
+    void *uni_data;
+    Py_UCS4 c;
+#else
+    Py_UNICODE *uni_buf, c;
+#endif
 
+#if PY_VERSION_HEX >= 0x03030000
+    if (PyUnicode_READY(c_obj) == -1) {
+        /* This function has no good way to signal errors.  For now, writing
+         * JSON null will have to do.
+         */
+        info->write(info->data, "null", 4);
+        PyErr_Clear();
+        return;
+    }
+    uni_kind = PyUnicode_KIND(c_obj);
+    uni_data = PyUnicode_DATA(c_obj);
+    uni_size = PyUnicode_GET_LENGTH(c_obj);
+#else
     uni_buf = PyUnicode_AS_UNICODE(c_obj);
     uni_size = PyUnicode_GET_SIZE(c_obj);
+#endif
 
     // Never try to dump more than this many chars
     if (uni_size > 100) {
@@ -425,7 +445,11 @@ _dump_unicode(struct ref_info *info, PyObject *c_obj)
     end = out_buf + 1024;
     *ptr++ = '"';
     for (i = 0; i < uni_size; ++i) {
+#if PY_VERSION_HEX >= 0x03030000
+        c = PyUnicode_READ(uni_kind, uni_data, i);
+#else
         c = uni_buf[i];
+#endif
         if (c <= 0x1f || c > 0x7e) {
             if (c > 0xFFFF) {
                 // Use surrogate pair.
@@ -535,7 +559,13 @@ _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj, int recurse)
         _write_static_to_info(info, ", \"value\": ");
         _dump_string(info, c_obj);
     } else if (PyUnicode_Check(c_obj)) {
-        _write_to_ref_info(info, ", \"len\": " SSIZET_FMT, PyUnicode_GET_SIZE(c_obj));
+        Py_ssize_t len;
+#if PY_VERSION_HEX >= 0x03030000
+        len = PyUnicode_GET_LENGTH(c_obj);
+#else
+        len = PyUnicode_GET_SIZE(c_obj);
+#endif
+        _write_to_ref_info(info, ", \"len\": " SSIZET_FMT, len);
         _write_static_to_info(info, ", \"value\": ");
         _dump_unicode(info, c_obj);
     } else if (PyBool_Check(c_obj)) {
