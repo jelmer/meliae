@@ -19,6 +19,8 @@
 
 #include "_scanner_core.h"
 
+#include "longintrepr.h"
+
 #ifndef Py_TYPE
 #  define Py_TYPE(o) ((o)->ob_type)
 #endif
@@ -268,6 +270,16 @@ _size_of_unicode(PyUnicodeObject *c_obj)
 
 
 static Py_ssize_t
+_size_of_long(PyLongObject *c_obj)
+{
+    Py_ssize_t size;
+    size = _basic_object_size((PyObject *)c_obj);
+    size += abs(Py_SIZE(c_obj)) * sizeof(digit);
+    return size;
+}
+
+
+static Py_ssize_t
 _size_of_from_specials(PyObject *c_obj)
 {
     PyObject *special_dict;
@@ -326,6 +338,8 @@ _size_of(PyObject *c_obj)
         return _size_of_dict((PyDictObject *)c_obj);
     } else if PyUnicode_Check(c_obj) {
         return _size_of_unicode((PyUnicodeObject *)c_obj);
+    } else if (PyLong_CheckExact(c_obj)) {
+        return _size_of_long((PyLongObject *)c_obj);
     } else if (PyTuple_CheckExact(c_obj)
             || PyBytes_CheckExact(c_obj)
 #if PY_VERSION_HEX < 0x03000000

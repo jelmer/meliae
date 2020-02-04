@@ -71,6 +71,14 @@ class TestSizeOf(tests.TestCase):
     def test_int(self):
         self.assertSizeOf(1)
 
+    def test_long(self):
+        long_type = int if sys.version_info[0] >= 3 else long
+        self.assertSizeOf(long_type(0))
+        self.assertSizeOf(long_type(1))
+        self.assertSizeOf(long_type(-1))
+        self.assertSizeOf(2 ** 65)
+        self.assertSizeOf(-(2 ** 65))
+
     def test_list_appended(self):
         # Lists over-allocate when you append to them, we want the *allocated*
         # size
