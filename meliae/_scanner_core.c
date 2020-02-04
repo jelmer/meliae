@@ -175,18 +175,50 @@ _size_of_set(PySetObject *c_obj)
 }
 
 
-#if PY_VERSION_HEX < 0x03000000
 static Py_ssize_t
 _size_of_dict(PyDictObject *c_obj)
 {
     Py_ssize_t size;
     size = _basic_object_size((PyObject *)c_obj);
+#if PY_VERSION_HEX < 0x03030000
     if (c_obj->ma_table != c_obj->ma_smalltable) {
         size += sizeof(PyDictEntry) * (c_obj->ma_mask + 1);
     }
+#else
+    /* The structure layout of PyDictKeysObject is inaccessible to us, but
+     * we need to know its dk_refcnt and dk_size fields for this
+     * optimisation.  Poke around in its internals to extract them.  This
+     * will break if PyDictKeysObject is rearranged in future Python
+     * versions.
+     */
+# define DK_REFCNT(dk) (*((Py_ssize_t *)c_obj->ma_keys))
+# define DK_SIZE(dk) (*((Py_ssize_t *)c_obj->ma_keys + 1))
+
+    if (c_obj->ma_values) {
+        Py_ssize_t num_values = DK_SIZE(c_obj->ma_keys);
+# if PY_VERSION_HEX >= 0x03060000
+        num_values = (num_values << 1) / 3;
+# endif
+        size += num_values * sizeof(PyObject *);
+    }
+    /* If the dictionary is split, the keys portion is accounted for in the
+     * type object.
+     */
+    if (DK_REFCNT(c_obj->ma_keys) == 1) {
+# if PY_VERSION_HEX < 0x03060000
+        /* We can't get the sizes of PyDictKeysObject or PyDictKeyEntry
+         * directly.  PyDictKeysObject is the same size as seven pointers;
+         * PyDictKeyEntry is the same size as three pointers.
+         */
+        size += 7 * sizeof(PyObject *) +
+                (DK_SIZE(c_obj->ma_keys) - 1) * (3 * sizeof(PyObject *));
+# else
+        size += _PyDict_KeysSize(c_obj->ma_keys);
+# endif
+    }
+#endif
     return size;
 }
-#endif
 
 
 static Py_ssize_t
@@ -290,15 +322,8 @@ _size_of(PyObject *c_obj)
         return _size_of_list((PyListObject *)c_obj);
     } else if PyAnySet_Check(c_obj) {
         return _size_of_set((PySetObject *)c_obj);
-#if PY_VERSION_HEX < 0x03000000
-    /* Only use this optimisation for Python 2.x.  Dict objects were
-     * rearranged in various 3.x versions, and we don't want to have to keep
-     * track of the details; in any case, they implement __sizeof__ (as in
-     * 2.x).
-     */
     } else if PyDict_Check(c_obj) {
         return _size_of_dict((PyDictObject *)c_obj);
-#endif
     } else if PyUnicode_Check(c_obj) {
         return _size_of_unicode((PyUnicodeObject *)c_obj);
     } else if (PyTuple_CheckExact(c_obj)
