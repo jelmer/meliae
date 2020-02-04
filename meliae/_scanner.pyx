@@ -14,7 +14,11 @@
 
 """The core routines for scanning python references and dumping memory info."""
 
-from cpython.string cimport PyString_FromStringAndSize
+from cpython.object cimport PyObject_AsFileDescriptor
+from libc.errno cimport (
+    EINTR,
+    errno,
+    )
 from libc.stdio cimport (
     fflush,
     FILE,
@@ -22,10 +26,10 @@ from libc.stdio cimport (
     fwrite,
     stderr,
     )
+from posix.unistd cimport write
 
 
 cdef extern from "Python.h":
-    FILE *PyFile_AsFile(object)
     int Py_UNICODE_SIZE
     ctypedef struct PyGC_Head:
         pass
@@ -62,17 +66,25 @@ def size_of(obj):
     return _size_of(obj)
 
 
-cdef void _file_io_callback(void *callee_data, char *bytes, size_t len):
-    cdef FILE *file_cb
+cdef void _fd_callback(void *callee_data, char *bytes, size_t len):
+    cdef int fd
+    cdef ssize_t n
 
-    file_cb = <FILE *>callee_data
-    fwrite(bytes, 1, len, file_cb)
+    fd = (<int *>callee_data)[0]
+    while len:
+        n = write(fd, bytes, len)
+        if n >= 0:
+            bytes += n
+            len -= n
+        elif errno != EINTR:
+            # XXX: We have no way to signal an error here at the moment.
+            return
 
 
 cdef void _callable_callback(void *callee_data, char *bytes, size_t len):
     callable = <object>callee_data
 
-    s = PyString_FromStringAndSize(bytes, len)
+    s = bytes[:len]
     callable(s)
 
 
@@ -81,7 +93,8 @@ def dump_object_info(object out, object obj, object nodump=None,
     """Dump the object information to the given output.
 
     :param out: Either a File object, or a callable.
-        If a File object, we will write bytes to the underlying FILE*
+        If a File object, we will write bytes to the underlying file
+        descriptor.
         Otherwise, we will call(str) with bytes as we build up the state of the
         object. Note that a single call will not be a complete description, but
         potentially a single character of the final formatted string.
@@ -93,15 +106,15 @@ def dump_object_info(object out, object obj, object nodump=None,
        referenced (such as strings).
        2 dump everything we find and continue recursing
     """
-    cdef FILE *fp_out
+    cdef int fd_out
 
-    fp_out = PyFile_AsFile(out)
-    if fp_out != NULL:
-        _dump_object_info(<write_callback>_file_io_callback, fp_out, obj,
-                          nodump, recurse_depth)
-        fflush(fp_out)
-    else:
+    try:
+        fd_out = PyObject_AsFileDescriptor(out)
+    except TypeError:
         _dump_object_info(<write_callback>_callable_callback, <void *>out, obj,
+                          nodump, recurse_depth)
+    else:
+        _dump_object_info(<write_callback>_fd_callback, &fd_out, obj,
                           nodump, recurse_depth)
     _clear_last_dumped()
 
