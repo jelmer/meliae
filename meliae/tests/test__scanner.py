@@ -143,6 +143,21 @@ class TestSizeOf(tests.TestCase):
         self.assertSizeOf(u'abcd')
         self.assertSizeOf(u'\xbe\xe5')
 
+    @unittest.skipUnless(
+        sys.version_info[:2] >= (3, 3),
+        "Compact/legacy Unicode object split is only relevant on "
+        "Python >= 3.3")
+    def test_legacy_unicode(self):
+        # In Python >= 3.3, Unicode objects are more compact by default, but
+        # subtypes use the legacy representation.
+        class LegacyUnicode(six.text_type):
+            pass
+
+        self.assertSizeOf(LegacyUnicode(u''))
+        self.assertSizeOf(LegacyUnicode(u'a'))
+        self.assertSizeOf(LegacyUnicode(u'abcd'))
+        self.assertSizeOf(LegacyUnicode(u'\xbe\xe5'))
+
     def test_None(self):
         self.assertSizeOf(None)
 

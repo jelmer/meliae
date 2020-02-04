@@ -186,17 +186,54 @@ _size_of_dict(PyDictObject *c_obj)
     }
     return size;
 }
+#endif
 
 
 static Py_ssize_t
 _size_of_unicode(PyUnicodeObject *c_obj)
 {
     Py_ssize_t size;
+#if PY_VERSION_HEX < 0x03030000
     size = _basic_object_size((PyObject *)c_obj);
     size += Py_UNICODE_SIZE * (c_obj->length + 1);
+#else
+    /* If it's a compact object, account for base structure + character
+     * data.
+     */
+    if (PyUnicode_IS_COMPACT_ASCII(c_obj))
+        size = sizeof(PyASCIIObject) + PyUnicode_GET_LENGTH(c_obj) + 1;
+    else if (PyUnicode_IS_COMPACT(c_obj))
+        size = sizeof(PyCompactUnicodeObject) +
+            (PyUnicode_GET_LENGTH(c_obj) + 1) * PyUnicode_KIND(c_obj);
+    else {
+        /* If it is a two-block object, account for base object, and for
+         * character block if present.
+         */
+        size = sizeof(PyUnicodeObject);
+        if (c_obj->data.any)
+            size += (PyUnicode_GET_LENGTH(c_obj) + 1) * PyUnicode_KIND(c_obj);
+    }
+    /* If the wstr pointer is present, account for it unless it is shared
+     * with the data pointer.  Check if the data is not shared.
+     */
+    if (((PyASCIIObject *)c_obj)->wstr &&
+        (!PyUnicode_IS_READY(c_obj) ||
+         ((PyASCIIObject *)c_obj)->wstr != PyUnicode_DATA(c_obj)))
+        size += (PyUnicode_WSTR_LENGTH(c_obj) + 1) * sizeof(wchar_t);
+    if (!PyUnicode_IS_COMPACT_ASCII(c_obj) &&
+        ((PyCompactUnicodeObject *)c_obj)->utf8 &&
+        ((PyCompactUnicodeObject *)c_obj)->utf8 != PyUnicode_DATA(c_obj))
+        size += (
+            PyUnicode_IS_COMPACT_ASCII(c_obj) ?
+            ((PyASCIIObject *)c_obj)->length :
+            ((PyCompactUnicodeObject *)c_obj)->utf8_length) + 1;
+    if (PyObject_IS_GC((PyObject *)c_obj)) {
+        size += sizeof(PyGC_Head);
+    }
+#endif
     return size;
 }
-#endif
+
 
 static Py_ssize_t
 _size_of_from_specials(PyObject *c_obj)
@@ -254,16 +291,16 @@ _size_of(PyObject *c_obj)
     } else if PyAnySet_Check(c_obj) {
         return _size_of_set((PySetObject *)c_obj);
 #if PY_VERSION_HEX < 0x03000000
-    /* Only use these optimisations for Python 2.x.  Dicts and Unicode
-     * objects were both rearranged in various 3.x versions, and we don't
-     * want to have to keep track of the details; in any case, they
-     * implement __sizeof__ (as in 2.x).
+    /* Only use this optimisation for Python 2.x.  Dict objects were
+     * rearranged in various 3.x versions, and we don't want to have to keep
+     * track of the details; in any case, they implement __sizeof__ (as in
+     * 2.x).
      */
     } else if PyDict_Check(c_obj) {
         return _size_of_dict((PyDictObject *)c_obj);
+#endif
     } else if PyUnicode_Check(c_obj) {
         return _size_of_unicode((PyUnicodeObject *)c_obj);
-#endif
     } else if (PyTuple_CheckExact(c_obj)
             || PyBytes_CheckExact(c_obj)
 #if PY_VERSION_HEX < 0x03000000
