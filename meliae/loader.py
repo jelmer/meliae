@@ -587,6 +587,8 @@ def iter_objs(source, using_json=False, show_prog=False, input_size=0,
         factory = _loader._MemObjectProxy_from_args
     for line_num, line in enumerate(source):
         bytes_read += len(line)
+        if isinstance(line, bytes):
+            line = line.decode('UTF-8')
         if line in ("[\n", "]\n"):
             continue
         if line.endswith(',\n'):
