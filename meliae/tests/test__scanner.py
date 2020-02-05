@@ -71,6 +71,14 @@ class TestSizeOf(tests.TestCase):
     def test_int(self):
         self.assertSizeOf(1)
 
+    def test_long(self):
+        long_type = int if sys.version_info[0] >= 3 else long
+        self.assertSizeOf(long_type(0))
+        self.assertSizeOf(long_type(1))
+        self.assertSizeOf(long_type(-1))
+        self.assertSizeOf(2 ** 65)
+        self.assertSizeOf(-(2 ** 65))
+
     def test_list_appended(self):
         # Lists over-allocate when you append to them, we want the *allocated*
         # size
@@ -142,6 +150,21 @@ class TestSizeOf(tests.TestCase):
         self.assertSizeOf(u'a')
         self.assertSizeOf(u'abcd')
         self.assertSizeOf(u'\xbe\xe5')
+
+    @unittest.skipUnless(
+        sys.version_info[:2] >= (3, 3),
+        "Compact/legacy Unicode object split is only relevant on "
+        "Python >= 3.3")
+    def test_legacy_unicode(self):
+        # In Python >= 3.3, Unicode objects are more compact by default, but
+        # subtypes use the legacy representation.
+        class LegacyUnicode(six.text_type):
+            pass
+
+        self.assertSizeOf(LegacyUnicode(u''))
+        self.assertSizeOf(LegacyUnicode(u'a'))
+        self.assertSizeOf(LegacyUnicode(u'abcd'))
+        self.assertSizeOf(LegacyUnicode(u'\xbe\xe5'))
 
     def test_None(self):
         self.assertSizeOf(None)

@@ -19,6 +19,8 @@
 
 #include "_scanner_core.h"
 
+#include "longintrepr.h"
+
 #ifndef Py_TYPE
 #  define Py_TYPE(o) ((o)->ob_type)
 #endif
@@ -133,11 +135,14 @@ _size_of_from__sizeof__(PyObject *c_obj)
     Py_ssize_t size = -1;
 
     if (PyType_CheckExact(c_obj)) {
-        // Types themselves may have a __sizeof__ attribute, but it is the
-        // unbound method, which takes an instance
-        return -1;
+	// Types themselves may have a __sizeof__ attribute, but it is the
+	// unbound method, which takes an instance; so we need to take care
+	// to use type.__sizeof__ instead.
+        size_obj = PyObject_CallMethod(
+            (PyObject *)&PyType_Type, "__sizeof__", "O", c_obj);
+    } else {
+        size_obj = PyObject_CallMethod(c_obj, "__sizeof__", NULL);
     }
-    size_obj = PyObject_CallMethod(c_obj, "__sizeof__", NULL);
     if (size_obj == NULL) {
         // Not sure what happened, but this won't work, it could be a simple
         // attribute error, or it could be something else.
@@ -177,9 +182,43 @@ _size_of_dict(PyDictObject *c_obj)
 {
     Py_ssize_t size;
     size = _basic_object_size((PyObject *)c_obj);
+#if PY_VERSION_HEX < 0x03030000
     if (c_obj->ma_table != c_obj->ma_smalltable) {
         size += sizeof(PyDictEntry) * (c_obj->ma_mask + 1);
     }
+#else
+    /* The structure layout of PyDictKeysObject is inaccessible to us, but
+     * we need to know its dk_refcnt and dk_size fields for this
+     * optimisation.  Poke around in its internals to extract them.  This
+     * will break if PyDictKeysObject is rearranged in future Python
+     * versions.
+     */
+# define DK_REFCNT(dk) (*((Py_ssize_t *)c_obj->ma_keys))
+# define DK_SIZE(dk) (*((Py_ssize_t *)c_obj->ma_keys + 1))
+
+    if (c_obj->ma_values) {
+        Py_ssize_t num_values = DK_SIZE(c_obj->ma_keys);
+# if PY_VERSION_HEX >= 0x03060000
+        num_values = (num_values << 1) / 3;
+# endif
+        size += num_values * sizeof(PyObject *);
+    }
+    /* If the dictionary is split, the keys portion is accounted for in the
+     * type object.
+     */
+    if (DK_REFCNT(c_obj->ma_keys) == 1) {
+# if PY_VERSION_HEX < 0x03060000
+        /* We can't get the sizes of PyDictKeysObject or PyDictKeyEntry
+         * directly.  PyDictKeysObject is the same size as seven pointers;
+         * PyDictKeyEntry is the same size as three pointers.
+         */
+        size += 7 * sizeof(PyObject *) +
+                (DK_SIZE(c_obj->ma_keys) - 1) * (3 * sizeof(PyObject *));
+# else
+        size += _PyDict_KeysSize(c_obj->ma_keys);
+# endif
+    }
+#endif
     return size;
 }
 
@@ -188,10 +227,57 @@ static Py_ssize_t
 _size_of_unicode(PyUnicodeObject *c_obj)
 {
     Py_ssize_t size;
+#if PY_VERSION_HEX < 0x03030000
     size = _basic_object_size((PyObject *)c_obj);
     size += Py_UNICODE_SIZE * (c_obj->length + 1);
+#else
+    /* If it's a compact object, account for base structure + character
+     * data.
+     */
+    if (PyUnicode_IS_COMPACT_ASCII(c_obj))
+        size = sizeof(PyASCIIObject) + PyUnicode_GET_LENGTH(c_obj) + 1;
+    else if (PyUnicode_IS_COMPACT(c_obj))
+        size = sizeof(PyCompactUnicodeObject) +
+            (PyUnicode_GET_LENGTH(c_obj) + 1) * PyUnicode_KIND(c_obj);
+    else {
+        /* If it is a two-block object, account for base object, and for
+         * character block if present.
+         */
+        size = sizeof(PyUnicodeObject);
+        if (c_obj->data.any)
+            size += (PyUnicode_GET_LENGTH(c_obj) + 1) * PyUnicode_KIND(c_obj);
+    }
+    /* If the wstr pointer is present, account for it unless it is shared
+     * with the data pointer.  Check if the data is not shared.
+     */
+    if (((PyASCIIObject *)c_obj)->wstr &&
+        (!PyUnicode_IS_READY(c_obj) ||
+         ((PyASCIIObject *)c_obj)->wstr != PyUnicode_DATA(c_obj)))
+        size += (PyUnicode_WSTR_LENGTH(c_obj) + 1) * sizeof(wchar_t);
+    if (!PyUnicode_IS_COMPACT_ASCII(c_obj) &&
+        ((PyCompactUnicodeObject *)c_obj)->utf8 &&
+        ((PyCompactUnicodeObject *)c_obj)->utf8 != PyUnicode_DATA(c_obj))
+        size += (
+            PyUnicode_IS_COMPACT_ASCII(c_obj) ?
+            ((PyASCIIObject *)c_obj)->length :
+            ((PyCompactUnicodeObject *)c_obj)->utf8_length) + 1;
+    if (PyObject_IS_GC((PyObject *)c_obj)) {
+        size += sizeof(PyGC_Head);
+    }
+#endif
     return size;
 }
+
+
+static Py_ssize_t
+_size_of_long(PyLongObject *c_obj)
+{
+    Py_ssize_t size;
+    size = _basic_object_size((PyObject *)c_obj);
+    size += abs(Py_SIZE(c_obj)) * sizeof(digit);
+    return size;
+}
+
 
 static Py_ssize_t
 _size_of_from_specials(PyObject *c_obj)
@@ -252,8 +338,10 @@ _size_of(PyObject *c_obj)
         return _size_of_dict((PyDictObject *)c_obj);
     } else if PyUnicode_Check(c_obj) {
         return _size_of_unicode((PyUnicodeObject *)c_obj);
+    } else if (PyLong_CheckExact(c_obj)) {
+        return _size_of_long((PyLongObject *)c_obj);
     } else if (PyTuple_CheckExact(c_obj)
-            || PyString_CheckExact(c_obj)
+            || PyBytes_CheckExact(c_obj)
 #if PY_VERSION_HEX < 0x03000000
             || PyInt_CheckExact(c_obj)
 #endif
