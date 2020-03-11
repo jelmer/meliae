@@ -46,35 +46,41 @@ if sys.platform == 'win32':
 # faster than simplejson without extensions, though slower than simplejson w/
 # extensions.
 _object_re = re.compile(
-    r'\{"address": (?P<address>\d+)'
-    r', "type": "(?P<type>[^"]*)"'
-    r', "size": (?P<size>\d+)'
-    r'(, "name": "(?P<name>.*)")?'
-    r'(, "len": (?P<len>\d+))?'
-    r'(, "value": (?P<valuequote>"?)(?P<value>.*)(?P=valuequote))?'
-    r', "refs": \[(?P<refs>[^]]*)\]'
-    r'\}')
+    br'\{"address": (?P<address>\d+)'
+    br', "type": "(?P<type>[^"]*)"'
+    br', "size": (?P<size>\d+)'
+    br'(, "name": "(?P<name>.*)")?'
+    br'(, "len": (?P<len>\d+))?'
+    br'(, "value": (?P<valuequote>"?)(?P<value>.*)(?P=valuequote))?'
+    br', "refs": \[(?P<refs>[^]]*)\]'
+    br'\}')
 
 _refs_re = re.compile(
-    r'(?P<ref>\d+)'
+    br'(?P<ref>\d+)'
     )
+
+text_type_name_bytes = six.text_type.__name__.encode('ASCII')
 
 
 def _from_json(cls, line, temp_cache=None):
     val = simplejson.loads(line)
     # simplejson likes to turn everything into unicode strings, but we know
-    # everything is just a plain 'str', and we can save some bytes if we
-    # cast it back
+    # everything is just plain ASCII, and we can save some bytes if we cast
+    # things back to `bytes`.  This is a little surprising on Python 3, but
+    # it makes it easier to deal with large dumps.
+    name = val.get('name', None)
+    if name is not None and isinstance(name, six.text_type):
+        name = name.encode('ASCII')
     obj = cls(address=val['address'],
-              type_str=str(val['type']),
+              type_str=val['type'].encode('ASCII'),
               size=val['size'],
               children=val['refs'],
               length=val.get('len', None),
               value=val.get('value', None),
-              name=val.get('name', None))
-    if (obj.type_str == 'str'):
-        if type(obj.value) is unicode:
-            obj.value = obj.value.encode('latin-1')
+              name=name)
+    if (val['type'] != six.text_type.__name__ and
+            isinstance(obj.value, six.text_type)):
+        obj.value = obj.value.encode('latin-1')
     if temp_cache is not None:
         obj._intern_from_cache(temp_cache)
     return obj
@@ -87,9 +93,9 @@ def _from_line(cls, line, temp_cache=None):
     (address, type_str, size, name, length, value,
      refs) = m.group('address', 'type', 'size', 'name', 'len',
                      'value', 'refs')
-    assert '\\' not in type_str
+    assert b'\\' not in type_str
     if name is not None:
-        assert '\\' not in name
+        assert b'\\' not in name
     if length is not None:
         length = int(length)
     refs = [int(val) for val in _refs_re.findall(refs)]
@@ -105,9 +111,8 @@ def _from_line(cls, line, temp_cache=None):
               length=length,
               value=value,
               name=name)
-    if (obj.type_str == 'str'):
-        if type(obj.value) is unicode:
-            obj.value = obj.value.encode('latin-1')
+    if obj.type_str == text_type_name_bytes and isinstance(obj.value, bytes):
+        obj.value = obj.value.decode('latin-1')
     if temp_cache is not None:
         obj._intern_from_cache(temp_cache)
     return obj
@@ -155,11 +160,14 @@ class _ObjSummary(object):
         self.summaries = None
 
     def _add(self, memobj):
+        type_str = memobj.type_str
+        if not isinstance(type_str, str):
+            type_str = type_str.decode('ASCII')
         try:
-            type_summary = self.type_summaries[memobj.type_str]
+            type_summary = self.type_summaries[type_str]
         except KeyError:
-            type_summary = _TypeSummary(memobj.type_str)
-            self.type_summaries[memobj.type_str] = type_summary
+            type_summary = _TypeSummary(type_str)
+            self.type_summaries[type_str] = type_summary
         type_summary._add(memobj)
         self.total_count += 1
         self.total_size += memobj.size
@@ -372,6 +380,8 @@ class ObjManager(object):
 
     def get_all(self, type_str):
         """Return all objects that match a given type."""
+        if not isinstance(type_str, bytes):
+            type_str = type_str.encode('ASCII')
         all = [o for o in self.objs.itervalues() if o.type_str == type_str]
         all.sort(key=lambda x:(x.size, len(x), x.num_parents),
                  reverse=True)
@@ -402,10 +412,10 @@ class ObjManager(object):
         tlast = timer()-20
         to_be_removed = set()
         for item_idx, obj in enumerate(self.objs.itervalues()):
-            if obj.type_str in ('str', 'dict', 'tuple', 'list', 'type',
-                                'function', 'wrapper_descriptor',
-                                'code', 'classobj', 'int',
-                                'weakref'):
+            if obj.type_str in (b'str', b'dict', b'tuple', b'list', b'type',
+                                b'function', b'wrapper_descriptor',
+                                b'code', b'classobj', b'int',
+                                b'weakref'):
                 continue
             if self.show_progress and item_idx & 0x3f:
                 tnow = timer()
@@ -413,22 +423,22 @@ class ObjManager(object):
                     tlast = tnow
                     sys.stderr.write('checked %8d / %8d collapsed %8d    \r'
                                      % (item_idx, total, collapsed))
-            if obj.type_str == 'module' and len(obj) == 1:
+            if obj.type_str == b'module' and len(obj) == 1:
                 (dict_obj,) = obj
-                if dict_obj.type_str != 'dict':
+                if dict_obj.type_str != b'dict':
                     continue
                 extra_refs = []
             else:
                 if len(obj) != 2:
                     continue
                 obj_1, obj_2 = obj
-                if obj_1.type_str == 'dict' and obj_2.type_str == 'type':
+                if obj_1.type_str == b'dict' and obj_2.type_str == b'type':
                     # This is a new-style class
                     dict_obj = obj_1
                     type_obj = obj_2
-                elif (obj.type_str == 'instance'
-                      and obj_1.type_str == 'classobj'
-                      and obj_2.type_str == 'dict'):
+                elif (obj.type_str == b'instance'
+                      and obj_1.type_str == b'classobj'
+                      and obj_2.type_str == b'dict'):
                     # This is an old-style class
                     type_obj = obj_1
                     dict_obj = obj_2
@@ -442,7 +452,7 @@ class ObjManager(object):
             obj.children = new_refs
             obj.size = obj.size + dict_obj.size
             obj.total_size = 0
-            if obj.type_str == 'instance':
+            if obj.type_str == b'instance':
                 obj.type_str = type_obj.value
             # Now that all the data has been moved into the instance, we
             # will want to remove the dict from the collection.  We'll do the
@@ -476,11 +486,11 @@ class ObjManager(object):
         children = obj.children
         for addr in children:
             val = self.objs[addr]
-            if val.type_str == 'bool':
+            if val.type_str == b'bool':
                 val = (val.value == 'True')
             elif val.value is not None:
                 val = val.value
-            elif val.type_str == 'NoneType':
+            elif val.type_str == b'NoneType':
                 val = None
             as_list.append(val)
         return as_list
@@ -492,7 +502,7 @@ class ObjManager(object):
         """
         for o in self.objs.itervalues():
             o_len = len(o)
-            if o.type_str != 'dict' or o_len == 0 or o.num_parents > 0:
+            if o.type_str != b'dict' or o_len == 0 or o.num_parents > 0:
                 # Must be a non-empty dict
                 continue
             # We avoid calling o.children so that we don't have to create
@@ -502,7 +512,7 @@ class ObjManager(object):
                 # objects are smart enough to get reused...
                 c_i = o[i]
                 c_i1 = o[i+1]
-                if c_i is not c_i1 or c_i.type_str != 'str':
+                if c_i is not c_i1 or c_i.type_str != b'str':
                     break
             else:
                 return o
@@ -574,7 +584,7 @@ def iter_objs(source, using_json=False, show_prog=False, input_size=0,
     input_mb = input_size / 1024. / 1024.
     temp_cache = {}
     address_re = re.compile(
-        r'{"address": (?P<address>\d+)'
+        br'{"address": (?P<address>\d+)'
         )
     bytes_read = count = 0
     last = 0
@@ -587,11 +597,9 @@ def iter_objs(source, using_json=False, show_prog=False, input_size=0,
         factory = _loader._MemObjectProxy_from_args
     for line_num, line in enumerate(source):
         bytes_read += len(line)
-        if isinstance(line, bytes):
-            line = line.decode('UTF-8')
-        if line in ("[\n", "]\n"):
+        if line in (b"[\n", b"]\n"):
             continue
-        if line.endswith(',\n'):
+        if line.endswith(b',\n'):
             line = line[:-2]
         if objs:
             # Skip duplicate objects
@@ -665,9 +673,9 @@ def remove_expensive_references(source, total_objs=0, show_progress=False):
         if show_progress and idx & 0x1ff == 0:
             sys.stderr.write('finding expensive refs... %8d / %8d    \r'
                              % (idx, total_steps))
-        if obj.type_str in ('module', 'frame', 'type'):
+        if obj.type_str in (b'module', b'frame', b'type'):
             noref_objs.add(obj.address)
-        if obj.type_str == '_LRUNode':
+        if obj.type_str == b'_LRUNode':
             lru_objs.add(obj.address)
         if obj.address == 0:
             seen_zero = True
@@ -685,7 +693,7 @@ def remove_expensive_references(source, total_objs=0, show_progress=False):
             sys.stderr.write('removing %d expensive refs... %8d / %8d   \r'
                              % (num_expensive, idx + total_objs,
                                 total_steps))
-        if obj.type_str == 'function':
+        if obj.type_str == b'function':
             # Functions have a reference to 'globals' which is not very
             # helpful for having a clear understanding of what is going on
             # especially since the function itself is in its own globals
@@ -698,7 +706,7 @@ def remove_expensive_references(source, total_objs=0, show_progress=False):
             obj.children = refs[:1] + refs[3:] + [0]
             yield (True, obj)
             continue
-        elif obj.type_str == '_LRUNode':
+        elif obj.type_str == b'_LRUNode':
             # We remove the 'sideways' references
             obj.children = [ref for ref in obj.children
                                  if ref not in lru_objs]

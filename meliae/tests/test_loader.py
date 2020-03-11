@@ -19,6 +19,8 @@ import os
 import sys
 import tempfile
 
+import six
+
 from meliae import (
     _loader,
     loader,
@@ -32,70 +34,77 @@ from meliae import (
 # a@5 = 1
 # b@4 = 2
 # c@6 = 'a str'
-# t@7 = (a, b)
+# u@8 = u'a unicode'
+# t@7 = (a, b, u)
 # d@2 = {a:b, c:t}
-# l@3 = [a, b]
+# l@3 = [a, b, u]
 # l.append(l)
 # outer@1 = (d, l)
 _example_dump = [
-b'{"address": 1, "type": "tuple", "size": 20, "len": 2, "refs": [2, 3]}',
-b'{"address": 3, "type": "list", "size": 44, "len": 3, "refs": [3, 4, 5]}',
-b'{"address": 5, "type": "int", "size": 12, "value": 1, "refs": []}',
-b'{"address": 4, "type": "int", "size": 12, "value": 2, "refs": []}',
-b'{"address": 2, "type": "dict", "size": 124, "len": 2, "refs": [4, 5, 6, 7]}',
-b'{"address": 7, "type": "tuple", "size": 20, "len": 2, "refs": [4, 5]}',
-b'{"address": 6, "type": "str", "size": 29, "len": 5, "value": "a str"'
- b', "refs": []}',
-b'{"address": 8, "type": "module", "size": 60, "name": "mymod", "refs": [2]}',
+'{"address": 1, "type": "tuple", "size": 20, "len": 2, "refs": [2, 3]}',
+'{"address": 3, "type": "list", "size": 44, "len": 3, "refs": [3, 4, 5, 8]}',
+'{"address": 5, "type": "int", "size": 12, "value": 1, "refs": []}',
+'{"address": 4, "type": "int", "size": 12, "value": 2, "refs": []}',
+'{"address": 2, "type": "dict", "size": 124, "len": 2, "refs": [4, 5, 6, 7]}',
+'{"address": 7, "type": "tuple", "size": 20, "len": 2, "refs": [4, 5, 8]}',
+'{"address": 6, "type": "%s", "size": 29, "len": 5, "value": "a str"'
+ ', "refs": []}' % bytes.__name__,
+'{"address": 8, "type": "%s", "size": 88, "len": 9, "value": "a unicode"'
+ ', "refs": []}' % six.text_type.__name__,
+'{"address": 9, "type": "module", "size": 60, "name": "mymod", "refs": [2]}',
 ]
+_example_dump = [line.encode('ASCII') for line in _example_dump]
 
 # Note that this doesn't have a complete copy of the references. Namely when
 # you subclass object you get a lot of references, and type instances also
 # reference other stuff that tends to chain to stuff like 'sys', which ends up
 # referencing everything.
 _instance_dump = [
-b'{"address": 1, "type": "MyClass", "size": 32, "refs": [2, 3]}',
-b'{"address": 3, "type": "type", "size": 452, "name": "MyClass", "refs": []}',
-b'{"address": 2, "type": "dict", "size": 140, "len": 4'
- b', "refs": [4, 5, 6, 7, 9, 10, 11, 12]}',
-b'{"address": 4, "type": "str", "size": 25, "len": 1, "value": "a", "refs": []}',
-b'{"address": 5, "type": "int", "size": 12, "value": 1, "refs": []}',
-b'{"address": 6, "type": "str", "size": 25, "len": 1, "value": "c", "refs": []}',
-b'{"address": 7, "type": "dict", "size": 140, "len": 1, "refs": [8, 6]}',
-b'{"address": 8, "type": "str", "size": 25, "len": 1, "value": "s", "refs": []}',
-b'{"address": 9, "type": "str", "size": 25, "len": 1, "value": "b", "refs": []}',
-b'{"address": 10, "type": "str", "size": 30, "len": 6'
- b', "value": "string", "refs": []}',
-b'{"address": 11, "type": "str", "size": 25, "len": 1, "value": "d", "refs": []}',
-b'{"address": 12, "type": "tuple", "size": 32, "len": 1, "refs": [13]}',
-b'{"address": 13, "type": "int", "size": 12, "value": 2, "refs": []}',
-b'{"address": 14, "type": "module", "size": 28, "name": "sys", "refs": [15]}',
-b'{"address": 15, "type": "dict", "size": 140, "len": 2, "refs": [5, 6, 9, 6]}',
+'{"address": 1, "type": "MyClass", "size": 32, "refs": [2, 3]}',
+'{"address": 3, "type": "type", "size": 452, "name": "MyClass", "refs": []}',
+'{"address": 2, "type": "dict", "size": 140, "len": 4'
+ ', "refs": [4, 5, 6, 7, 9, 10, 11, 12]}',
+'{"address": 4, "type": "str", "size": 25, "len": 1, "value": "a", "refs": []}',
+'{"address": 5, "type": "int", "size": 12, "value": 1, "refs": []}',
+'{"address": 6, "type": "str", "size": 25, "len": 1, "value": "c", "refs": []}',
+'{"address": 7, "type": "dict", "size": 140, "len": 1, "refs": [8, 6]}',
+'{"address": 8, "type": "str", "size": 25, "len": 1, "value": "s", "refs": []}',
+'{"address": 9, "type": "str", "size": 25, "len": 1, "value": "b", "refs": []}',
+'{"address": 10, "type": "str", "size": 30, "len": 6'
+ ', "value": "string", "refs": []}',
+'{"address": 11, "type": "str", "size": 25, "len": 1, "value": "d", "refs": []}',
+'{"address": 12, "type": "tuple", "size": 32, "len": 1, "refs": [13]}',
+'{"address": 13, "type": "int", "size": 12, "value": 2, "refs": []}',
+'{"address": 14, "type": "module", "size": 28, "name": "sys", "refs": [15]}',
+'{"address": 15, "type": "dict", "size": 140, "len": 2, "refs": [5, 6, 9, 6]}',
 ]
+_instance_dump = [line.encode('ASCII') for line in _instance_dump]
 
 _old_instance_dump = [
-b'{"address": 1, "type": "instance", "size": 36, "refs": [2, 3]}',
-b'{"address": 3, "type": "dict", "size": 140, "len": 2, "refs": [4, 5, 6, 7]}',
-b'{"address": 7, "type": "int", "size": 12, "value": 2, "refs": []}',
-b'{"address": 6, "type": "str", "size": 25, "len": 1, "value": "b", "refs": []}',
-b'{"address": 5, "type": "int", "size": 12, "value": 1, "refs": []}',
-b'{"address": 4, "type": "str", "size": 25, "len": 1, "value": "a", "refs": []}',
-b'{"address": 2, "type": "classobj", "size": 48, "name": "OldStyle"'
- b', "refs": [8, 43839680, 9]}',
-b'{"address": 9, "type": "str", "size": 32, "len": 8, "value": "OldStyle"'
- b', "refs": []}',
-b'{"address": 8, "type": "tuple", "size": 28, "len": 0, "refs": []}',
+'{"address": 1, "type": "instance", "size": 36, "refs": [2, 3]}',
+'{"address": 3, "type": "dict", "size": 140, "len": 2, "refs": [4, 5, 6, 7]}',
+'{"address": 7, "type": "int", "size": 12, "value": 2, "refs": []}',
+'{"address": 6, "type": "str", "size": 25, "len": 1, "value": "b", "refs": []}',
+'{"address": 5, "type": "int", "size": 12, "value": 1, "refs": []}',
+'{"address": 4, "type": "str", "size": 25, "len": 1, "value": "a", "refs": []}',
+'{"address": 2, "type": "classobj", "size": 48, "name": "OldStyle"'
+ ', "refs": [8, 43839680, 9]}',
+'{"address": 9, "type": "str", "size": 32, "len": 8, "value": "OldStyle"'
+ ', "refs": []}',
+'{"address": 8, "type": "tuple", "size": 28, "len": 0, "refs": []}',
 ]
+_old_instance_dump = [line.encode('ASCII') for line in _old_instance_dump]
 
 _intern_dict_dump = [
-b'{"address": 2, "type": "str", "size": 25, "len": 1, "value": "a", "refs": []}',
-b'{"address": 3, "type": "str", "size": 25, "len": 1, "value": "b", "refs": []}',
-b'{"address": 4, "type": "str", "size": 25, "len": 1, "value": "c", "refs": []}',
-b'{"address": 5, "type": "str", "size": 25, "len": 1, "value": "d", "refs": []}',
-b'{"address": 6, "type": "dict", "size": 512, "refs": [2, 5, 5, 5, 4, 4, 3, 3]}',
-b'{"address": 7, "type": "dict", "size": 512, "refs": [6, 6, 5, 5, 4, 4, 3, 3]}',
-b'{"address": 8, "type": "dict", "size": 512, "refs": [2, 2, 5, 5, 4, 4, 3, 3]}',
+'{"address": 2, "type": "str", "size": 25, "len": 1, "value": "a", "refs": []}',
+'{"address": 3, "type": "str", "size": 25, "len": 1, "value": "b", "refs": []}',
+'{"address": 4, "type": "str", "size": 25, "len": 1, "value": "c", "refs": []}',
+'{"address": 5, "type": "str", "size": 25, "len": 1, "value": "d", "refs": []}',
+'{"address": 6, "type": "dict", "size": 512, "refs": [2, 5, 5, 5, 4, 4, 3, 3]}',
+'{"address": 7, "type": "dict", "size": 512, "refs": [6, 6, 5, 5, 4, 4, 3, 3]}',
+'{"address": 8, "type": "dict", "size": 512, "refs": [2, 2, 5, 5, 4, 4, 3, 3]}',
 ]
+_intern_dict_dump = [line.encode('ASCII') for line in _intern_dict_dump]
 
 
 class TestLoad(tests.TestCase):
@@ -132,12 +141,15 @@ class TestLoad(tests.TestCase):
                 b', "refs": []}',
             b'{"address": 2345, "type": "module", "size": 60, "name": "mymod"'
                 b', "refs": [1234]}',
-            b'{"address": 4567, "type": "str", "size": 150, "len": 126'
-                b', "value": "Test \\\'whoami\\\'\\u000a\\"Your name\\""'
-                b', "refs": []}'
+            ('{"address": 4567, "type": "%s", "size": 150, "len": 126'
+                ', "value": "Test \\/whoami\\/\\u000a\\"Your name\\""'
+                ', "refs": []}' % bytes.__name__).encode('UTF-8'),
+            ('{"address": 5678, "type": "%s", "size": 150, "len": 126'
+                ', "value": "Test \\/whoami\\/\\u000a\\"Your name\\""'
+                ', "refs": []}' % six.text_type.__name__).encode('UTF-8'),
             ], using_json=False, show_prog=False).objs
         keys = sorted(objs.keys())
-        self.assertEqual([1234, 2345, 4567], keys)
+        self.assertEqual([1234, 2345, 4567, 5678], keys)
         obj = objs[1234]
         self.assertTrue(isinstance(obj, _loader._MemObjectProxy))
         # The address should be exactly the same python object as the key in
@@ -145,10 +157,16 @@ class TestLoad(tests.TestCase):
         self.assertTrue(keys[0] is obj.address)
         self.assertEqual(10, obj.value)
         obj = objs[2345]
-        self.assertEqual("module", obj.type_str)
-        self.assertEqual("mymod", obj.value)
+        self.assertEqual(b"module", obj.type_str)
+        self.assertEqual(b"mymod", obj.value)
         obj = objs[4567]
-        self.assertEqual("Test \\'whoami\\'\\u000a\\\"Your name\\\"", obj.value)
+        self.assertTrue(isinstance(obj.value, bytes))
+        self.assertEqual(
+            b"Test \\/whoami\\/\\u000a\\\"Your name\\\"", obj.value)
+        obj = objs[5678]
+        self.assertTrue(isinstance(obj.value, six.text_type))
+        self.assertEqual(
+            u"Test \\/whoami\\/\\u000a\\\"Your name\\\"", obj.value)
 
     def test_load_example(self):
         objs = loader.load(_example_dump, show_prog=False)
@@ -189,7 +207,7 @@ class TestLoad(tests.TestCase):
         om = loader.load(_example_dump, show_prog=False)
         an_int = om[5]
         self.assertEqual(5, an_int.address)
-        self.assertEqual('int', an_int.type_str)
+        self.assertEqual(b'int', an_int.type_str)
 
 
 class TestRemoveExpensiveReferences(tests.TestCase):
@@ -197,24 +215,24 @@ class TestRemoveExpensiveReferences(tests.TestCase):
     def test_remove_expensive_references(self):
         lines = list(_example_dump)
         lines.pop(-1) # Remove the old module
-        lines.append(b'{"address": 8, "type": "module", "size": 12'
-                     b', "name": "mymod", "refs": [9]}')
-        lines.append(b'{"address": 9, "type": "dict", "size": 124'
-                     b', "refs": [10, 11]}')
-        lines.append(b'{"address": 10, "type": "module", "size": 12'
-                     b', "name": "mod2", "refs": [12]}')
-        lines.append(b'{"address": 11, "type": "str", "size": 27'
+        lines.append(b'{"address": 9, "type": "module", "size": 12'
+                     b', "name": "mymod", "refs": [10]}')
+        lines.append(b'{"address": 10, "type": "dict", "size": 124'
+                     b', "refs": [11, 12]}')
+        lines.append(b'{"address": 11, "type": "module", "size": 12'
+                     b', "name": "mod2", "refs": [13]}')
+        lines.append(b'{"address": 12, "type": "str", "size": 27'
                      b', "value": "boo", "refs": []}')
-        lines.append(b'{"address": 12, "type": "dict", "size": 124'
+        lines.append(b'{"address": 13, "type": "dict", "size": 124'
                      b', "refs": []}')
         source = lambda:loader.iter_objs(lines)
-        mymod_dict = list(source())[8]
-        self.assertEqual([10, 11], mymod_dict.children)
+        mymod_dict = list(source())[9]
+        self.assertEqual([11, 12], mymod_dict.children)
         result = list(loader.remove_expensive_references(source))
         null_obj = result[0][1]
         self.assertEqual(0, null_obj.address)
-        self.assertEqual('<ex-reference>', null_obj.type_str)
-        self.assertEqual([11, 0], result[9][1].children)
+        self.assertEqual(b'<ex-reference>', null_obj.type_str)
+        self.assertEqual([12, 0], result[10][1].children)
 
 
 class TestMemObj(tests.TestCase):
@@ -226,12 +244,15 @@ class TestMemObj(tests.TestCase):
         expected = [
 '{"address": 1, "type": "tuple", "size": 20, "refs": [2, 3]}',
 '{"address": 2, "type": "dict", "size": 124, "refs": [4, 5, 6, 7]}',
-'{"address": 3, "type": "list", "size": 44, "refs": [3, 4, 5]}',
+'{"address": 3, "type": "list", "size": 44, "refs": [3, 4, 5, 8]}',
 '{"address": 4, "type": "int", "size": 12, "value": 2, "refs": []}',
 '{"address": 5, "type": "int", "size": 12, "value": 1, "refs": []}',
-'{"address": 6, "type": "str", "size": 29, "value": "a str", "refs": []}',
-'{"address": 7, "type": "tuple", "size": 20, "refs": [4, 5]}',
-'{"address": 8, "type": "module", "size": 60, "value": "mymod", "refs": [2]}',
+'{"address": 6, "type": "%s", "size": 29, "value": "a str"'
+ ', "refs": []}' % bytes.__name__,
+'{"address": 7, "type": "tuple", "size": 20, "refs": [4, 5, 8]}',
+'{"address": 8, "type": "%s", "size": 88, "value": "a unicode"'
+ ', "refs": []}' % six.text_type.__name__,
+'{"address": 9, "type": "module", "size": 60, "value": "mymod", "refs": [2]}',
         ]
         self.assertEqual(expected, [obj.to_json() for obj in objs])
 
@@ -243,11 +264,12 @@ class TestObjManager(tests.TestCase):
         objs = manager.objs
         self.assertEqual((), objs[1].parents)
         self.assertEqual([1, 3], objs[3].parents)
-        self.assertEqual([3, 7, 8], sorted(objs[4].parents))
-        self.assertEqual([3, 7, 8], sorted(objs[5].parents))
-        self.assertEqual([8], objs[6].parents)
-        self.assertEqual([8], objs[7].parents)
-        self.assertEqual((), objs[8].parents)
+        self.assertEqual([3, 7, 9], sorted(objs[4].parents))
+        self.assertEqual([3, 7, 9], sorted(objs[5].parents))
+        self.assertEqual([9], objs[6].parents)
+        self.assertEqual([9], objs[7].parents)
+        self.assertEqual([3, 7], objs[8].parents)
+        self.assertEqual((), objs[9].parents)
 
     def test_compute_referrers(self):
         # Deprecated
@@ -267,11 +289,12 @@ class TestObjManager(tests.TestCase):
             warn.trap_warnings(old_func)
         self.assertEqual((), objs[1].parents)
         self.assertEqual([1, 3], objs[3].parents)
-        self.assertEqual([3, 7, 8], sorted(objs[4].parents))
-        self.assertEqual([3, 7, 8], sorted(objs[5].parents))
-        self.assertEqual([8], objs[6].parents)
-        self.assertEqual([8], objs[7].parents)
-        self.assertEqual((), objs[8].parents)
+        self.assertEqual([3, 7, 9], sorted(objs[4].parents))
+        self.assertEqual([3, 7, 9], sorted(objs[5].parents))
+        self.assertEqual([9], objs[6].parents)
+        self.assertEqual([9], objs[7].parents)
+        self.assertEqual([3, 7], objs[8].parents)
+        self.assertEqual((), objs[9].parents)
 
     def test_compute_parents_ignore_repeated(self):
         manager = loader.load(_intern_dict_dump, show_prog=False)
@@ -308,42 +331,42 @@ class TestObjManager(tests.TestCase):
     def test_compute_total_size(self):
         manager = loader.load(_example_dump, show_prog=False)
         objs = manager.objs
-        manager.compute_total_size(objs[8])
-        self.assertEqual(257, objs[8].total_size)
+        manager.compute_total_size(objs[9])
+        self.assertEqual(345, objs[9].total_size)
 
     def test_compute_total_size_missing_ref(self):
         lines = list(_example_dump)
         # 999 isn't in the dump, not sure how we get these in real life, but
         # they exist. we should live with references that can't be resolved.
-        lines[-1] = (b'{"address": 8, "type": "tuple", "size": 16, "len": 1'
+        lines[-1] = (b'{"address": 9, "type": "tuple", "size": 16, "len": 1'
                      b', "refs": [999]}')
         manager = loader.load(lines, show_prog=False)
-        obj = manager[8]
+        obj = manager[9]
         manager.compute_total_size(obj)
         self.assertEqual(16, obj.total_size)
 
     def test_remove_expensive_references(self):
         lines = list(_example_dump)
         lines.pop(-1) # Remove the old module
-        lines.append(b'{"address": 8, "type": "module", "size": 12'
-                     b', "name": "mymod", "refs": [9]}')
-        lines.append(b'{"address": 9, "type": "dict", "size": 124'
-                     b', "refs": [10, 11]}')
-        lines.append(b'{"address": 10, "type": "module", "size": 12'
-                     b', "name": "mod2", "refs": [12]}')
-        lines.append(b'{"address": 11, "type": "str", "size": 27'
+        lines.append(b'{"address": 9, "type": "module", "size": 12'
+                     b', "name": "mymod", "refs": [10]}')
+        lines.append(b'{"address": 10, "type": "dict", "size": 124'
+                     b', "refs": [11, 12]}')
+        lines.append(b'{"address": 11, "type": "module", "size": 12'
+                     b', "name": "mod2", "refs": [13]}')
+        lines.append(b'{"address": 12, "type": "str", "size": 27'
                      b', "value": "boo", "refs": []}')
-        lines.append(b'{"address": 12, "type": "dict", "size": 124'
+        lines.append(b'{"address": 13, "type": "dict", "size": 124'
                      b', "refs": []}')
         manager = loader.load(lines, show_prog=False, collapse=False)
-        mymod_dict = manager.objs[9]
-        self.assertEqual([10, 11], mymod_dict.children)
+        mymod_dict = manager.objs[10]
+        self.assertEqual([11, 12], mymod_dict.children)
         manager.remove_expensive_references()
         self.assertTrue(0 in manager.objs)
         null_obj = manager.objs[0]
         self.assertEqual(0, null_obj.address)
-        self.assertEqual('<ex-reference>', null_obj.type_str)
-        self.assertEqual([11, 0], mymod_dict.children)
+        self.assertEqual(b'<ex-reference>', null_obj.type_str)
+        self.assertEqual([12, 0], mymod_dict.children)
 
     def test_collapse_instance_dicts(self):
         manager = loader.load(_instance_dump, show_prog=False, collapse=False)
@@ -377,7 +400,7 @@ class TestObjManager(tests.TestCase):
         manager = loader.load(_old_instance_dump, show_prog=False,
                               collapse=False)
         instance = manager.objs[1]
-        self.assertEqual('instance', instance.type_str)
+        self.assertEqual(b'instance', instance.type_str)
         self.assertEqual(36, instance.size)
         self.assertEqual([2, 3], instance.children)
         inst_dict = manager[3]
@@ -391,7 +414,7 @@ class TestObjManager(tests.TestCase):
         self.assertFalse(3 in manager.objs)
         self.assertEqual(176, instance.size)
         self.assertEqual([4, 5, 6, 7, 2], instance.children)
-        self.assertEqual('OldStyle', instance.type_str)
+        self.assertEqual(b'OldStyle', instance.type_str)
 
     def test_expand_refs_as_dict(self):
         # TODO: This test fails if simplejson is not installed, because the
@@ -420,16 +443,18 @@ class TestObjManager(tests.TestCase):
 
     def test_summarize_refs(self):
         manager = loader.load(_example_dump, show_prog=False)
-        summary = manager.summarize(manager[8])
+        summary = manager.summarize(manager[9])
         # Note that the module is included in the summary
-        self.assertEqual(['int', 'module', 'str', 'tuple'],
+        self.assertEqual(sorted(['int', 'module', bytes.__name__,
+                                 six.text_type.__name__, 'tuple']),
                          sorted(summary.type_summaries.keys()))
-        self.assertEqual(257, summary.total_size)
+        self.assertEqual(345, summary.total_size)
 
     def test_summarize_excluding(self):
         manager = loader.load(_example_dump, show_prog=False)
-        summary = manager.summarize(manager[8], excluding=[4, 5])
+        summary = manager.summarize(manager[9], excluding=[4, 5])
         # No ints when they are explicitly filtered
-        self.assertEqual(['module', 'str', 'tuple'],
+        self.assertEqual(sorted(['module', bytes.__name__,
+                                 six.text_type.__name__, 'tuple']),
                          sorted(summary.type_summaries.keys()))
-        self.assertEqual(233, summary.total_size)
+        self.assertEqual(321, summary.total_size)
