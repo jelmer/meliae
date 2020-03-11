@@ -41,7 +41,7 @@ class TestDumpAllReferenced(tests.TestCase):
         # so we need to split it back into 1-line-per-record
         ref_lines = [test__scanner.py_dump_object_info(ref_obj)
                      for ref_obj in ref_objs]
-        ref_lines = set(''.join(ref_lines).splitlines(True))
+        ref_lines = set(b''.join(ref_lines).splitlines(True))
         self.assertEqual(sorted(ref_lines), sorted(lines))
 
     def test_dump_str(self):
