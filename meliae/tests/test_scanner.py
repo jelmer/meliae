@@ -98,15 +98,13 @@ class TestGetRecursiveSize(tests.TestCase):
         self.assertRecursiveSize(1, scanner.size_of(l), l)
 
     def test_referenced(self):
-        s1 = 'this is a simple string'
-        s2 = 'and this is another one'
-        s3 = s1 + s2
-        s4 = 'this is a' + ' simple string'# same as s1, but diff object
-        self.assertTrue(s1 is not s4)
-        self.assertTrue(s1 == s4)
-        d = {s1:s2, s3:s4}
-        total_size = (scanner.size_of(s1) + scanner.size_of(s2)
-                      + scanner.size_of(s3) + scanner.size_of(s4)
+        o1 = object()
+        s2 = 'this is a simple string'
+        o3 = object()
+        s4 = 'and this is another one'
+        d = {o1: s2, o3: s4}
+        total_size = (scanner.size_of(o1) + scanner.size_of(s2)
+                      + scanner.size_of(o3) + scanner.size_of(s4)
                       + scanner.size_of(d))
         self.assertRecursiveSize(5, total_size, d)
 
