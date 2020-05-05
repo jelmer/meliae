@@ -38,6 +38,9 @@ from meliae import (
     )
 
 
+if sys.version_info[0] >= 3:
+    intern = sys.intern
+
 timer = time.time
 if sys.platform == 'win32':
     timer = time.clock
@@ -46,35 +49,39 @@ if sys.platform == 'win32':
 # faster than simplejson without extensions, though slower than simplejson w/
 # extensions.
 _object_re = re.compile(
-    r'\{"address": (?P<address>\d+)'
-    r', "type": "(?P<type>[^"]*)"'
-    r', "size": (?P<size>\d+)'
-    r'(, "name": "(?P<name>.*)")?'
-    r'(, "len": (?P<len>\d+))?'
-    r'(, "value": (?P<valuequote>"?)(?P<value>.*)(?P=valuequote))?'
-    r', "refs": \[(?P<refs>[^]]*)\]'
-    r'\}')
+    br'\{"address": (?P<address>\d+)'
+    br', "type": "(?P<type>[^"]*)"'
+    br', "size": (?P<size>\d+)'
+    br'(, "name": "(?P<name>.*)")?'
+    br'(, "len": (?P<len>\d+))?'
+    br'(, "value": (?P<valuequote>"?)(?P<value>.*)(?P=valuequote))?'
+    br', "refs": \[(?P<refs>[^]]*)\]'
+    br'\}')
 
 _refs_re = re.compile(
-    r'(?P<ref>\d+)'
+    br'(?P<ref>\d+)'
     )
 
 
 def _from_json(cls, line, temp_cache=None):
     val = simplejson.loads(line)
     # simplejson likes to turn everything into unicode strings, but we know
-    # everything is just a plain 'str', and we can save some bytes if we
-    # cast it back
+    # everything is just plain ASCII, and we can save some bytes if we cast
+    # things back to `bytes`.  This is a little surprising on Python 3, but
+    # it makes it easier to deal with large dumps.
+    name = val.get('name', None)
+    if name is not None and isinstance(name, six.text_type):
+        name = name.encode('ASCII')
     obj = cls(address=val['address'],
-              type_str=str(val['type']),
+              type_str=intern(str(val['type'])),
               size=val['size'],
               children=val['refs'],
               length=val.get('len', None),
               value=val.get('value', None),
-              name=val.get('name', None))
-    if (obj.type_str == 'str'):
-        if type(obj.value) is unicode:
-            obj.value = obj.value.encode('latin-1')
+              name=name)
+    if (obj.type_str != six.text_type.__name__ and
+            isinstance(obj.value, six.text_type)):
+        obj.value = obj.value.encode('latin-1')
     if temp_cache is not None:
         obj._intern_from_cache(temp_cache)
     return obj
@@ -87,9 +94,11 @@ def _from_line(cls, line, temp_cache=None):
     (address, type_str, size, name, length, value,
      refs) = m.group('address', 'type', 'size', 'name', 'len',
                      'value', 'refs')
+    if not isinstance(type_str, str):
+        type_str = type_str.decode('UTF-8')
     assert '\\' not in type_str
     if name is not None:
-        assert '\\' not in name
+        assert b'\\' not in name
     if length is not None:
         length = int(length)
     refs = [int(val) for val in _refs_re.findall(refs)]
@@ -105,9 +114,8 @@ def _from_line(cls, line, temp_cache=None):
               length=length,
               value=value,
               name=name)
-    if (obj.type_str == 'str'):
-        if type(obj.value) is unicode:
-            obj.value = obj.value.encode('latin-1')
+    if obj.type_str == six.text_type.__name__ and isinstance(obj.value, bytes):
+        obj.value = obj.value.decode('latin-1')
     if temp_cache is not None:
         obj._intern_from_cache(temp_cache)
     return obj
@@ -443,7 +451,10 @@ class ObjManager(object):
             obj.size = obj.size + dict_obj.size
             obj.total_size = 0
             if obj.type_str == 'instance':
-                obj.type_str = type_obj.value
+                instance_type_str = type_obj.value
+                if not isinstance(instance_type_str, str):
+                    instance_type_str = instance_type_str.decode('UTF-8')
+                obj.type_str = instance_type_str
             # Now that all the data has been moved into the instance, we
             # will want to remove the dict from the collection.  We'll do the
             # actual deletion later, since we are using iteritems for this
@@ -576,7 +587,7 @@ def iter_objs(source, using_json=False, show_prog=False, input_size=0,
     input_mb = input_size / 1024. / 1024.
     temp_cache = {}
     address_re = re.compile(
-        r'{"address": (?P<address>\d+)'
+        br'{"address": (?P<address>\d+)'
         )
     bytes_read = count = 0
     last = 0
@@ -589,9 +600,9 @@ def iter_objs(source, using_json=False, show_prog=False, input_size=0,
         factory = _loader._MemObjectProxy_from_args
     for line_num, line in enumerate(source):
         bytes_read += len(line)
-        if line in ("[\n", "]\n"):
+        if line in (b"[\n", b"]\n"):
             continue
-        if line.endswith(',\n'):
+        if line.endswith(b',\n'):
             line = line[:-2]
         if objs:
             # Skip duplicate objects

@@ -354,7 +354,10 @@ class Test_MemObjectProxy(tests.TestCase):
         mop.children = [addr876542+1, addr654320+1]
         mop.parents = [addr876542+1, addr654320+1]
         self.assertFalse(mop.address is addr)
-        self.assertFalse(mop.type_str is t)
+        # type_str always gets interned, so mop.type_str is identical to the
+        # cached object even though its input string isn't.
+        self.assertFalse(type_str is t)
+        self.assertTrue(mop.type_str is t)
         rl = mop.children
         self.assertFalse(rl[0] is addr876543)
         self.assertFalse(rl[1] is addr654321)

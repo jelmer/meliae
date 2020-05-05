@@ -54,7 +54,13 @@ cdef extern from "Python.h":
                                              PyObject *val) except -1
 
 import gc
+import sys
+
 from meliae import warn
+
+
+if sys.version_info[0] >= 3:
+    intern = sys.intern
 
 
 ctypedef struct RefList:
@@ -176,6 +182,7 @@ cdef _MemObject *_new_mem_object(address, type_str, size, children,
     addr = <PyObject *>address
     Py_XINCREF(addr)
     new_entry.address = addr
+    type_str = intern(type_str)
     new_entry.type_str = <PyObject *>type_str
     Py_XINCREF(new_entry.type_str)
     new_entry.size = size
@@ -550,9 +557,12 @@ cdef class _MemObjectProxy:
             else:
                 # TODO: This isn't perfect, as it doesn't do proper json
                 #       escaping
-                if '"' in self.value:
-                    raise AssertionError(self.value)
-                value = '"value": "%s", ' % self.value
+                text_value = self.value
+                if sys.version_info[0] >= 3 and isinstance(text_value, bytes):
+                    text_value = text_value.decode('latin-1')
+                if '"' in text_value:
+                    raise AssertionError(text_value)
+                value = '"value": "%s", ' % text_value
         else:
             value = ''
         return '{"address": %d, "type": "%s", "size": %d, %s"refs": [%s]}' % (
@@ -579,7 +589,9 @@ cdef class _MemObjectProxy:
             #       a tuple/dict/etc
             if val.type_str == 'bool':
                 val = (val.value == 'True')
-            elif val.type_str in ('int', 'long', 'str', 'unicode', 'float',
+            elif val.type_str in ('int', 'long',
+                                  'bytes', 'str', 'unicode',
+                                  'float',
                                   ) and val.value is not None:
                 val = val.value
             elif val.type_str == 'NoneType':
