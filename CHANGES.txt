@@ -8,11 +8,15 @@ Meliae Changes
 Meliae 0.5
 ##########
 
-:0.5: (not released yet)
+:0.5: 2020-05-05
 
 * Allow using negative indexes for MemObjectProxy. So you can do
   'obj[-1]' to get the last child, (same as obj.c[-1]).
   (Robert Xiao, #882356)
+
+* Python 3 Support thanks to lots of great contributions from Colin
+  Watson, the library can now be used to dump and track memory usage
+  from Python 3.4-3.8. (Colin Watson, #1175950)
 
 Meliae 0.4
 ##########
