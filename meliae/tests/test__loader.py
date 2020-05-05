@@ -339,13 +339,20 @@ class Test_MemObjectProxy(tests.TestCase):
         t = cache['my  type']
         self.assertTrue(mop.type_str is t)
         del self.moc[addr]
-        mop = self.moc.add(1234566+1, 'my ' + ' ty' + 'pe', 256)
+        # We have to work a bit here to defeat the more aggressive constant
+        # folding in Python >= 3.7.
+        addr1234566 = 1234566
+        type_str = 'my  ty'
+        type_str += 'pe'
+        mop = self.moc.add(addr1234566+1, type_str, 256)
         addr876543 = 876543
         cache[addr876543] = addr876543
         addr654321 = 654321
         cache[addr654321] = addr654321
-        mop.children = [876542+1, 654320+1]
-        mop.parents = [876542+1, 654320+1]
+        addr876542 = 876542
+        addr654320 = 654320
+        mop.children = [addr876542+1, addr654320+1]
+        mop.parents = [addr876542+1, addr654320+1]
         self.assertFalse(mop.address is addr)
         self.assertFalse(mop.type_str is t)
         rl = mop.children
