@@ -528,10 +528,12 @@ def load(source, using_json=None, show_prog=True, collapse=True,
     cleanup = None
     if isinstance(source, six.string_types):
         source, cleanup = files.open_file(source)
-        if isinstance(source, file):
-            input_size = os.fstat(source.fileno()).st_size
-        else:
-            input_size = 0
+        input_size = 0
+        if hasattr(source, "fileno"):
+            try:
+                input_size = os.fstat(source.fileno()).st_size
+            except OSError:
+                pass
     elif isinstance(source, (list, tuple)):
         input_size = sum(map(len, source))
     else:
