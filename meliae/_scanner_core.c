@@ -481,13 +481,13 @@ _dump_json_c_string(struct ref_info *info, const char *buf, Py_ssize_t len)
 }
 
 void
-_dump_string(struct ref_info *info, PyObject *c_obj)
+_dump_bytes(struct ref_info *info, PyObject *c_obj)
 {
     Py_ssize_t str_size;
     char *str_buf;
 
-    str_buf = PyString_AS_STRING(c_obj);
-    str_size = PyString_GET_SIZE(c_obj);
+    str_buf = PyBytes_AS_STRING(c_obj);
+    str_size = PyBytes_GET_SIZE(c_obj);
 
     _dump_json_c_string(info, str_buf, str_size);
 }
@@ -563,6 +563,13 @@ _dump_unicode(struct ref_info *info, PyObject *c_obj)
 }
 
 
+#if PY_VERSION_HEX >= 0x03000000
+#  define _dump_str _dump_unicode
+#else
+#  define _dump_str _dump_bytes
+#endif
+
+
 void 
 _dump_object_info(write_callback write, void *callee_data,
                   PyObject *c_obj, PyObject *nodump, int recurse)
@@ -587,7 +594,7 @@ _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj, int recurse)
 {
     int retval;
     int do_traverse;
-    char *name;
+    const char *name;
 
     if (info->nodump != NULL && 
         info->nodump != Py_None
@@ -631,7 +638,7 @@ _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj, int recurse)
         }
     } else if (PyFunction_Check(c_obj)) {
         _write_static_to_info(info, ", \"name\": ");
-        _dump_string(info, ((PyFunctionObject *)c_obj)->func_name);
+        _dump_str(info, ((PyFunctionObject *)c_obj)->func_name);
     } else if (PyType_Check(c_obj)) {
         _write_static_to_info(info, ", \"name\": ");
         _dump_json_c_string(info, ((PyTypeObject *)c_obj)->tp_name, -1);
@@ -639,13 +646,13 @@ _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj, int recurse)
     } else if (PyClass_Check(c_obj)) {
         /* Old style class */
         _write_static_to_info(info, ", \"name\": ");
-        _dump_string(info, ((PyClassObject *)c_obj)->cl_name);
+        _dump_bytes(info, ((PyClassObject *)c_obj)->cl_name);
 #endif
     }
-    if (PyString_Check(c_obj)) {
-        _write_to_ref_info(info, ", \"len\": " SSIZET_FMT, PyString_GET_SIZE(c_obj));
+    if (PyBytes_Check(c_obj)) {
+        _write_to_ref_info(info, ", \"len\": " SSIZET_FMT, PyBytes_GET_SIZE(c_obj));
         _write_static_to_info(info, ", \"value\": ");
-        _dump_string(info, c_obj);
+        _dump_bytes(info, c_obj);
     } else if (PyUnicode_Check(c_obj)) {
         Py_ssize_t len;
 #if PY_VERSION_HEX >= 0x03030000
@@ -682,7 +689,7 @@ _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj, int recurse)
     	PyCodeObject *co = ((PyFrameObject*)c_obj)->f_code;
         if (co) {
             _write_static_to_info(info, ", \"value\": ");
-            _dump_string(info, co->co_name);
+            _dump_str(info, co->co_name);
         }
     }
     _write_static_to_info(info, ", \"refs\": [");

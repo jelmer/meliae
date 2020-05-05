@@ -77,23 +77,23 @@ class TestPerformanceCounter(tests.TestCase):
         # value is accurate, but we can at least try
         # Create a very large string, and then delete it.
         p = subprocess.Popen([sys.executable, '-c',
-            'x = "abcd"*(10*1000*1000); del x;'
+            'x = b"abcd"*(10*1000*1000); del x;'
             'import sys;'
             'sys.stdout.write(sys.stdin.read(3));'
             'sys.stdout.flush();'
             'sys.stdout.write(sys.stdin.read(4));'
             'sys.stdout.flush(); sys.stdout.close()'],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        p.stdin.write('pre')
+        p.stdin.write(b'pre')
         p.stdin.flush()
         p.stdout.read(3)
         cur_mem, peak_mem = perf_counter.perf_counter.get_memory(p)
-	if cur_mem is None or peak_mem is None:
-	    # fail gracefully, though we may want a stronger assertion here
-	    return
+        if cur_mem is None or peak_mem is None:
+            # fail gracefully, though we may want a stronger assertion here
+            return
         self.assertTrue(isinstance(cur_mem, six.integer_types))
         self.assertTrue(isinstance(peak_mem, six.integer_types))
-        p.stdin.write('post')
+        p.stdin.write(b'post')
         p.stdin.flush()
         p.stdout.read()
         self.assertEqual(0, p.wait())
