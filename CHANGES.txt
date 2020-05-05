@@ -5,6 +5,14 @@ Meliae Changes
 .. contents:: List of Releases
    :depth: 1
 
+Meliae 0.5.1
+############
+
+:0.5.1: 2020-05-05
+
+* Fix up the setup.py descriptions to make publishing to PyPI correct.
+  (John Arbash Meinel)
+
 Meliae 0.5
 ##########
 

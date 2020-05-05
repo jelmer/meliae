@@ -60,6 +60,7 @@ def config():
             'Programming Language :: Cython',
             'Topic :: Software Development :: Debuggers',
         ],
+        "long_description_content_type": "text/x-rst",
         "long_description": """\
 This project is similar to heapy (in the 'guppy' project), in its attempt to
 understand how memory has been allocated.
