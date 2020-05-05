@@ -104,7 +104,7 @@ class TestMemObjectCollection(tests.TestCase):
         moc.add(0, 'foo', 100)
         mop = moc[0]
         self.assertTrue(isinstance(mop, _loader._MemObjectProxy))
-        self.assertEqual(b'foo', mop.type_str)
+        self.assertEqual('foo', mop.type_str)
         self.assertEqual(100, mop.size)
         self.assertRaises(KeyError, get, 1024)
         self.assertTrue(mop is moc[mop])
@@ -269,16 +269,15 @@ class TestMemObjectCollection(tests.TestCase):
     def test_traverse_simple_item(self):
         moc = _loader.MemObjectCollection()
         moc.add(1234, 'foo', 100)
-        self.assertEqual([1234, b'foo', None], _scanner.get_referents(moc))
+        self.assertEqual([1234, 'foo', None], _scanner.get_referents(moc))
 
     def test_traverse_multiple_and_parents_and_children(self):
         moc = _loader.MemObjectCollection()
         moc.add(1, 'foo', 100)
         moc.add(2, 'bar', 200, children=[8, 9], parent_list=[10, 11],
                 value='test val')
-        self.assertEqual(
-            [1, b'foo', None, 2, b'bar', 'test val', 8, 9, 10, 11],
-            _scanner.get_referents(moc))
+        self.assertEqual([1, 'foo', None, 2, 'bar', 'test val', 8, 9, 10, 11],
+                         _scanner.get_referents(moc))
 
 
 class Test_MemObjectProxy(tests.TestCase):
@@ -294,7 +293,7 @@ class Test_MemObjectProxy(tests.TestCase):
     def test_basic_proxy(self):
         mop = self.moc[0]
         self.assertEqual(0, mop.address)
-        self.assertEqual(b'foo', mop.type_str)
+        self.assertEqual('foo', mop.type_str)
         self.assertEqual(100, mop.size)
         mop.size = 1024
         self.assertEqual(1024, mop.size)
@@ -304,7 +303,7 @@ class Test_MemObjectProxy(tests.TestCase):
     def test_deleted_proxy(self):
         mop = self.moc[0]
         del self.moc[0]
-        self.assertEqual(b'foo', mop.type_str)
+        self.assertEqual('foo', mop.type_str)
         self.assertEqual(100, mop.size)
         self.assertEqual(0, len(mop))
 
@@ -320,9 +319,9 @@ class Test_MemObjectProxy(tests.TestCase):
 
     def test_type_str(self):
         mop = self.moc.add(1234, 'type', 256, value='testval')
-        self.assertEqual(b'type', mop.type_str)
+        self.assertEqual('type', mop.type_str)
         mop.type_str = 'difftype'
-        self.assertEqual(b'difftype', mop.type_str)
+        self.assertEqual('difftype', mop.type_str)
 
     def test_name(self):
         mop = self.moc.add(1234, 'type', 256, name='the name')
@@ -337,7 +336,7 @@ class Test_MemObjectProxy(tests.TestCase):
         self.assertTrue(addr in cache)
         self.assertTrue(mop.address is addr)
         self.assertTrue(cache[addr] is addr)
-        t = cache[b'my  type']
+        t = cache['my  type']
         self.assertTrue(mop.type_str is t)
         del self.moc[addr]
         # We have to work a bit here to defeat the more aggressive constant
@@ -355,7 +354,10 @@ class Test_MemObjectProxy(tests.TestCase):
         mop.children = [addr876542+1, addr654320+1]
         mop.parents = [addr876542+1, addr654320+1]
         self.assertFalse(mop.address is addr)
-        self.assertFalse(mop.type_str is t)
+        # type_str always gets interned, so mop.type_str is identical to the
+        # cached object even though its input string isn't.
+        self.assertFalse(type_str is t)
+        self.assertTrue(mop.type_str is t)
         rl = mop.children
         self.assertFalse(rl[0] is addr876543)
         self.assertFalse(rl[1] is addr654321)
@@ -426,9 +428,9 @@ class Test_MemObjectProxy(tests.TestCase):
         mop255 = mop[1]
         self.assertEqual([mop0, mop255], list(mop))
         self.assertEqual(0, mop0.address)
-        self.assertEqual(b'foo', mop0.type_str)
+        self.assertEqual('foo', mop0.type_str)
         self.assertEqual(255, mop255.address)
-        self.assertEqual(b'baz', mop255.type_str)
+        self.assertEqual('baz', mop255.type_str)
 
     def test__getitem__neg(self):
         mop = self.moc.add(1234567, 'type', 256, children=[0, 255])
@@ -436,7 +438,7 @@ class Test_MemObjectProxy(tests.TestCase):
         mop255 = mop[-1]
         self.assertEqual([mop0, mop255], list(mop))
         self.assertEqual(255, mop255.address)
-        self.assertEqual(b'baz', mop255.type_str)
+        self.assertEqual('baz', mop255.type_str)
 
     def test__getitem__exception(self):
         mop = self.moc.add(1234567, 'type', 256, children=[0, 255])

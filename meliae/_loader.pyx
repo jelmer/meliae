@@ -59,6 +59,10 @@ import sys
 from meliae import warn
 
 
+if sys.version_info[0] >= 3:
+    intern = sys.intern
+
+
 ctypedef struct RefList:
     long size
     PyObject *refs[0]
@@ -178,8 +182,7 @@ cdef _MemObject *_new_mem_object(address, type_str, size, children,
     addr = <PyObject *>address
     Py_XINCREF(addr)
     new_entry.address = addr
-    if not isinstance(type_str, bytes):
-        type_str = type_str.encode('ASCII')
+    type_str = intern(type_str)
     new_entry.type_str = <PyObject *>type_str
     Py_XINCREF(new_entry.type_str)
     new_entry.size = size
@@ -327,8 +330,6 @@ cdef class _MemObjectProxy:
 
         def __set__(self, value):
             cdef PyObject *ptr
-            if not isinstance(value, bytes):
-                value = value.encode('ASCII')
             ptr = <PyObject *>value
             Py_XINCREF(ptr)
             Py_XDECREF(self._obj.type_str)
@@ -539,13 +540,8 @@ cdef class _MemObjectProxy:
                 total_size = total_size / 1024.0
                 order = 'G'
             total_size_str = ' %.1f%stot' % (total_size, order)
-        type_str = self.type_str
-        if not isinstance(type_str, str):
-            # type_str is bytes on Python 3 for efficiency, but we need str
-            # to get the right results from %s formatting.
-            type_str = type_str.decode('ASCII')
         return '%s(%d %dB%s%s%s%s)' % (
-            type_str, self.address, self.size,
+            self.type_str, self.address, self.size,
             refs, parent_str, val, total_size_str)
 
     def to_json(self):
@@ -556,7 +552,7 @@ cdef class _MemObjectProxy:
         # Note: We've lost the info about whether this was a value or a name
         #       We've also lost the 'length' field.
         if self.value is not None:
-            if self.type_str == b'int':
+            if self.type_str == 'int':
                 value = '"value": %s, ' % self.value
             else:
                 # TODO: This isn't perfect, as it doesn't do proper json
@@ -569,13 +565,8 @@ cdef class _MemObjectProxy:
                 value = '"value": "%s", ' % text_value
         else:
             value = ''
-        type_str = self.type_str
-        if not isinstance(type_str, str):
-            # type_str is bytes on Python 3 for efficiency, but we need str
-            # to get the right results from %s formatting.
-            type_str = type_str.decode('ASCII')
         return '{"address": %d, "type": "%s", "size": %d, %s"refs": [%s]}' % (
-            self.address, type_str, self.size, value, ', '.join(refs))
+            self.address, self.type_str, self.size, value, ', '.join(refs))
 
     def refs_as_dict(self):
         """Expand the ref list considering it to be a 'dict' structure.
@@ -585,8 +576,7 @@ cdef class _MemObjectProxy:
         """
         as_dict = {}
         children = self.children
-        if (len(children) % 2 == 1 and
-                self.type_str not in (b'dict', b'module')):
+        if len(children) % 2 == 1 and self.type_str not in ('dict', 'module'):
             # Instance dicts end with a 'type' reference, but only do that if
             # we actually have an odd number
             children = children[:-1]
@@ -597,14 +587,14 @@ cdef class _MemObjectProxy:
                 key = key.value
             # TODO: We should consider recursing if val is a 'known' type, such
             #       a tuple/dict/etc
-            if val.type_str == b'bool':
+            if val.type_str == 'bool':
                 val = (val.value == 'True')
-            elif val.type_str in (b'int', b'long',
-                                  b'bytes', b'str', b'unicode',
-                                  b'float',
+            elif val.type_str in ('int', 'long',
+                                  'bytes', 'str', 'unicode',
+                                  'float',
                                   ) and val.value is not None:
                 val = val.value
-            elif val.type_str == b'NoneType':
+            elif val.type_str == 'NoneType':
                 val = None
             as_dict[key] = val
         return as_dict
@@ -650,8 +640,6 @@ cdef class _MemObjectProxy:
         :return: A list of all entries, sorted with the largest entries first.
         """
         cdef list all
-        if not isinstance(type_str, bytes):
-            type_str = type_str.encode('ASCII')
         all = []
         for item in self.iter_recursive_refs(excluding=excluding):
             if item.type_str == type_str:

@@ -157,7 +157,7 @@ class TestLoad(tests.TestCase):
         self.assertTrue(keys[0] is obj.address)
         self.assertEqual(10, obj.value)
         obj = objs[2345]
-        self.assertEqual(b"module", obj.type_str)
+        self.assertEqual("module", obj.type_str)
         self.assertEqual(b"mymod", obj.value)
         obj = objs[4567]
         self.assertTrue(isinstance(obj.value, bytes))
@@ -207,7 +207,7 @@ class TestLoad(tests.TestCase):
         om = loader.load(_example_dump, show_prog=False)
         an_int = om[5]
         self.assertEqual(5, an_int.address)
-        self.assertEqual(b'int', an_int.type_str)
+        self.assertEqual('int', an_int.type_str)
 
 
 class TestRemoveExpensiveReferences(tests.TestCase):
@@ -231,7 +231,7 @@ class TestRemoveExpensiveReferences(tests.TestCase):
         result = list(loader.remove_expensive_references(source))
         null_obj = result[0][1]
         self.assertEqual(0, null_obj.address)
-        self.assertEqual(b'<ex-reference>', null_obj.type_str)
+        self.assertEqual('<ex-reference>', null_obj.type_str)
         self.assertEqual([12, 0], result[10][1].children)
 
 
@@ -365,7 +365,7 @@ class TestObjManager(tests.TestCase):
         self.assertTrue(0 in manager.objs)
         null_obj = manager.objs[0]
         self.assertEqual(0, null_obj.address)
-        self.assertEqual(b'<ex-reference>', null_obj.type_str)
+        self.assertEqual('<ex-reference>', null_obj.type_str)
         self.assertEqual([12, 0], mymod_dict.children)
 
     def test_collapse_instance_dicts(self):
@@ -400,7 +400,7 @@ class TestObjManager(tests.TestCase):
         manager = loader.load(_old_instance_dump, show_prog=False,
                               collapse=False)
         instance = manager.objs[1]
-        self.assertEqual(b'instance', instance.type_str)
+        self.assertEqual('instance', instance.type_str)
         self.assertEqual(36, instance.size)
         self.assertEqual([2, 3], instance.children)
         inst_dict = manager[3]
@@ -414,7 +414,7 @@ class TestObjManager(tests.TestCase):
         self.assertFalse(3 in manager.objs)
         self.assertEqual(176, instance.size)
         self.assertEqual([4, 5, 6, 7, 2], instance.children)
-        self.assertEqual(b'OldStyle', instance.type_str)
+        self.assertEqual('OldStyle', instance.type_str)
 
     def test_expand_refs_as_dict(self):
         # TODO: This test fails if simplejson is not installed, because the
