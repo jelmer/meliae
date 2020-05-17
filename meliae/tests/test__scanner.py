@@ -470,6 +470,14 @@ class TestDumpInfo(tests.TestCase):
     def test_dump_int(self):
         self.assertDumpInfo(1)
 
+    def test_dump_large_int(self):
+        t = tempfile.TemporaryFile(prefix='meliae-')
+        t_file = getattr(t, 'file', t)
+        try:
+            _scanner.dump_object_info(t_file, 2**80)
+        except OverflowError:
+            self.fail('OveflowError raised')
+
     def test_dump_tuple(self):
         obj1 = object()
         obj2 = object()
