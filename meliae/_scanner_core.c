@@ -670,11 +670,11 @@ _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj, int recurse)
         } else if (c_obj == Py_False) {
             _write_static_to_info(info, ", \"value\": \"False\"");
         } else {
-            _write_to_ref_info(info, ", \"value\": %ld", PyLong_AsLong(c_obj));
+            _write_to_ref_info(info, ", \"value\": %lld", PyLong_AsLongLongAndOverflow(c_obj, &overflow));
         }
 #if PY_VERSION_HEX < 0x03000000
     } else if (PyInt_CheckExact(c_obj)) {
-        _write_to_ref_info(info, ", \"value\": %ld", PyInt_AS_LONG(c_obj));
+        _write_to_ref_info(info, ", \"value\": %lld", PyLong_AsLongLongAndOverflow(c_obj, &overflow));
 #endif
     } else if (PyLong_CheckExact(c_obj)) {
         _write_to_ref_info(info, ", \"value\": %lld", PyLong_AsLongLongAndOverflow(c_obj, &overflow));
