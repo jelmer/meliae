@@ -120,6 +120,17 @@ class _LinuxPerformanceCounter(PerformanceCounter):
         return current, peak
 
 
+class _HurdPerformanceCounter(PerformanceCounter):
+
+    def get_timer(self):
+        # This returns wall-clock time
+        return time.time
+
+    def get_memory(self, process):
+        # TODO: Implement support for GNU Hurd.
+        raise NotImplementedError(self.get_memory)
+
+
 class _Win32PerformanceCounter(PerformanceCounter):
 
     def get_timer(self):
@@ -174,6 +185,8 @@ if sys.platform == 'win32':
                     ('PeakPagefileUsage', ctypes.c_size_t),
                     ('PrivateUsage', ctypes.c_size_t),
                    ]
+elif sys.platform == 'gnu0':
+    perf_counter = _HurdPerformanceCounter()
 else:
     perf_counter = _LinuxPerformanceCounter()
 

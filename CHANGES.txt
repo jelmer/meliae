@@ -13,6 +13,9 @@ Meliae 0.5.2
 * Improve dumping of PyInt in python3.
   (Colin Watson)
 
+* Raise NotImplementedError when trying to get memory counters on
+  GNU/Hurd. (Jelmer Vernooĳ)
+
 Meliae 0.5.1
 ############
 
