@@ -14,6 +14,6 @@
 
 """A simple way to dump memory consumption of a running python program."""
 
-version_info = (0, 5, 1, '', 0)
-__version__ = '0.5.1'
+version_info = (0, 5, 2, '', 0)
+__version__ = '0.5.2'
 

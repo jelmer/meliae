@@ -676,7 +676,15 @@ _dump_object_to_ref_info(struct ref_info *info, PyObject *c_obj, int recurse)
         _write_to_ref_info(info, ", \"value\": %ld", PyInt_AS_LONG(c_obj));
 #endif
     } else if (PyLong_CheckExact(c_obj)) {
-        _write_to_ref_info(info, ", \"value\": %ld", PyLong_AsLong(c_obj));
+        /* Python long objects are arbitrary-precision and might overflow.
+         * Rather than risking allocations in the case of large numbers, we
+         * just omit dumping such values.
+         */
+        int overflow = 0;
+        long long value = PyLong_AsLongLongAndOverflow(c_obj, &overflow);
+        if (!overflow) {
+            _write_to_ref_info(info, ", \"value\": %lld", value);
+        }
     } else if (PyTuple_Check(c_obj)) {
         _write_to_ref_info(info, ", \"len\": " SSIZET_FMT, PyTuple_GET_SIZE(c_obj));
     } else if (PyList_Check(c_obj)) {

@@ -347,8 +347,12 @@ def _py_dump_json_obj(obj):
         content.append(', "value": "True"')
     elif obj is False:
         content.append(', "value": "False"')
-    elif isinstance(obj, int):
-        content.append(', "value": %d' % (obj,))
+    elif isinstance(obj, six.integer_types):
+        # This isn't quite accurate (the real behaviour is that only values
+        # that fit into a C long long are dumped), but it's close enough for
+        # a fake test version such as this.
+        if abs(obj) <= sys.maxsize:
+            content.append(', "value": %d' % (obj,))
     elif isinstance(obj, types.FrameType):
         content.append(', "value": "%s"' % (obj.f_code.co_name,))
     content.append(', "refs": [')
@@ -469,6 +473,15 @@ class TestDumpInfo(tests.TestCase):
 
     def test_dump_int(self):
         self.assertDumpInfo(1)
+
+    def test_dump_medium_long(self):
+        long_type = int if sys.version_info[0] >= 3 else long
+        self.assertDumpInfo(long_type(2 ** 16))
+
+    def test_dump_large_long(self):
+        # The intent here is to test large numbers that don't fit into a C
+        # long long.
+        self.assertDumpInfo(2 ** 256)
 
     def test_dump_tuple(self):
         obj1 = object()

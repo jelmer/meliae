@@ -5,6 +5,14 @@ Meliae Changes
 .. contents:: List of Releases
    :depth: 1
 
+Meliae 0.5.2
+############
+
+:0.5.2: unknown
+
+* Improve dumping of PyInt in python3.
+  (Colin Watson)
+
 Meliae 0.5.1
 ############
 
