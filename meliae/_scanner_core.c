@@ -47,6 +47,17 @@
 #   define inline
 #endif
 
+#if PY_VERSION_HEX < 0x03090000
+#  define SIZEOF_PYGC_HEAD sizeof(PyGC_Head)
+#else
+/* Obviously extremely fragile, but Python 3.9 went to some lengths to make
+ * this opaque.  See Include/internal/pycore_gc.h in Python.
+ */
+#  define SIZEOF_PYGC_HEAD (2 * sizeof(uintptr_t))
+#endif
+
+const Py_ssize_t _sizeof_PyGC_Head = SIZEOF_PYGC_HEAD;
+
 struct ref_info {
     write_callback write;
     void *data;
@@ -83,7 +94,7 @@ _basic_object_size(PyObject *c_obj)
     Py_ssize_t size;
     size = Py_TYPE(c_obj)->tp_basicsize;
     if (PyObject_IS_GC(c_obj)) {
-        size += sizeof(PyGC_Head);
+        size += SIZEOF_PYGC_HEAD;
     }
     return size;
 }
@@ -123,7 +134,7 @@ _object_to_size_with_gc(PyObject *size_obj, PyObject *c_obj)
     // There is one trick left. Namely, __sizeof__ doesn't include the
     // GC overhead, so let's add that back in
     if (PyObject_IS_GC(c_obj)) {
-        size += sizeof(PyGC_Head);
+        size += SIZEOF_PYGC_HEAD;
     }
     return size;
 }
@@ -177,6 +188,10 @@ _size_of_set(PySetObject *c_obj)
 }
 
 
+#if PY_VERSION_HEX < 0x03090000
+/* This optimization is too difficult as of Python 3.9, since more of the
+ * internal structure has become opaque.  We'll just rely on __sizeof__.
+ */
 static Py_ssize_t
 _size_of_dict(PyDictObject *c_obj)
 {
@@ -221,6 +236,7 @@ _size_of_dict(PyDictObject *c_obj)
 #endif
     return size;
 }
+#endif
 
 
 static Py_ssize_t
@@ -262,7 +278,7 @@ _size_of_unicode(PyUnicodeObject *c_obj)
             ((PyASCIIObject *)c_obj)->length :
             ((PyCompactUnicodeObject *)c_obj)->utf8_length) + 1;
     if (PyObject_IS_GC((PyObject *)c_obj)) {
-        size += sizeof(PyGC_Head);
+        size += SIZEOF_PYGC_HEAD;
     }
 #endif
     return size;
@@ -330,13 +346,15 @@ _size_of(PyObject *c_obj)
 {
     Py_ssize_t size;
 
-    if PyList_Check(c_obj) {
+    if (PyList_Check(c_obj)) {
         return _size_of_list((PyListObject *)c_obj);
-    } else if PyAnySet_Check(c_obj) {
+    } else if (PyAnySet_Check(c_obj)) {
         return _size_of_set((PySetObject *)c_obj);
-    } else if PyDict_Check(c_obj) {
+#if PY_VERSION_HEX < 0x03090000
+    } else if (PyDict_Check(c_obj)) {
         return _size_of_dict((PyDictObject *)c_obj);
-    } else if PyUnicode_Check(c_obj) {
+#endif
+    } else if (PyUnicode_Check(c_obj)) {
         return _size_of_unicode((PyUnicodeObject *)c_obj);
     } else if (PyLong_CheckExact(c_obj)) {
         return _size_of_long((PyLongObject *)c_obj);
