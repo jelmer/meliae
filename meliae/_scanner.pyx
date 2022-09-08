@@ -36,6 +36,7 @@ cdef extern from "Python.h":
 
 
 cdef extern from "_scanner_core.h":
+    const Py_ssize_t _sizeof_PyGC_Head
     Py_ssize_t _size_of(object c_obj)
     ctypedef char* const_pchar "const char*"
     ctypedef void (*write_callback)(void *callee_data, const_pchar bytes,
@@ -49,7 +50,7 @@ cdef extern from "_scanner_core.h":
 
 
 _word_size = sizeof(Py_ssize_t)
-_gc_head_size = sizeof(PyGC_Head)
+_gc_head_size = _sizeof_PyGC_Head
 _unicode_size = Py_UNICODE_SIZE
 
 

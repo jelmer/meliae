@@ -28,6 +28,11 @@
 #include <stdio.h>
 
 /**
+ * The size of PyGC_Head.
+ */
+extern const Py_ssize_t _sizeof_PyGC_Head;
+
+/**
  * Compute the size of the data directly addressed by this object.
  *
  * For example, for a list, this is the number of bytes allocated plus the
